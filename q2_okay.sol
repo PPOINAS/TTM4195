@@ -13,7 +13,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
  * - Storing the metadata on JSON outside the blockchain can drastically 
  *   reduce the gas used ;
  * - The current car lessee is represented by the current owner of the NFT ;
- *
  */
 
 

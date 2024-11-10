@@ -6,13 +6,22 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 
-/** Documentation for the developers
+/** Notes for the developers:
  *
  * - 'onlyOwner' means that only the owner of the contrat can 
  *   call this function ;
  * - Storing the metadata on JSON outside the blockchain can drastically 
  *   reduce the gas used ;
  * - The current car lessee is represented by the current owner of the NFT ;
+ */
+
+
+/** Useful documentations:
+ *
+ * - https://docs.openzeppelin.com/contracts/5.x/erc721
+ * - https://docs.openzeppelin.com/contracts/5.x/access-control
+ * - https://github.com/OpenZeppelin/openzeppelin-contracts/tree/master/contracts
+ * - https://docs.openzeppelin.com/contracts/5.x/api/utils
  */
 
 
