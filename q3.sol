@@ -95,22 +95,20 @@ contract carForRent is ERC721, Ownable {
 
     /**
      * @dev Calculate the monthly quota for renting the car.
-     * @param carID The unique ID of the car
+     * @param carOriginalValue The original value of the car
      * @param driverExperience Years of possession of a driving license
      * @param mileageCap The mileage cap (fixed values)
      * @param contractDuration The duration of the contract (fixed values)
      * @return monthlyQuota The calculated monthly quota
      */
-    function calculateMonthlyQuota(
-        uint256 carID,
+    function calculateMonthlyQuota (
+        uint256 carOriginalValue,
         uint256 driverExperience,
         uint256 mileageCap,
         uint256 contractDuration
-    ) public view returns (uint256 monthlyQuota) {
-        // Retrieve the car in the mapping
-        Car memory car = getCarDetails(carID);
+    ) public pure returns (uint256 monthlyQuota) {
         // Useful constants for calculation
-        uint256 monthlyBase = (car.originalValue * 4)/100; // Base cost: 4% of vehicle value per month
+        uint256 monthlyBase = (carOriginalValue * 4)/100; // Base cost: 4% of vehicle value per month
         // Apply discount based on driver experience
         // Each year of experience above 5 year provides a 0.5% discount, capped at 3%
         uint256 experienceDiscount = driverExperience >= 5 ? ((driverExperience - 5) * 5 / 1000) : 0;
@@ -138,5 +136,55 @@ contract carForRent is ERC721, Ownable {
         monthlyQuota = monthlyBase - discount + mileageAdjustment - durationDiscount;
         // Return value
         return monthlyQuota;
+    }
+
+
+    struct Lease {
+        address lessee;
+        address lessor;
+        uint256 monthlyPayment;
+        uint256 downPayment;
+        bool lessorConfirmed;
+    }
+
+
+    mapping(uint256 => Lease) public _leases;
+
+
+    function initiateLease (
+        uint256 carId,
+        uint256 driverExperience,
+        uint256 mileageCap,
+        uint256 contractDuration,
+        address lessor
+    ) external payable {
+        // Compute and verify payment amount
+        Car memory car = getCarDetails(carId);
+        uint256 monthlyPayment = calculateMonthlyQuota(car.originalValue, driverExperience, mileageCap, contractDuration);
+        uint256 downPayment = 3*monthlyPayment;
+        require(msg.value == monthlyPayment + downPayment, "Incorrect payment amount");
+        // Creation of the lease
+        _leases[carId] = Lease({
+            lessee: msg.sender,
+            lessor: lessor,
+            monthlyPayment: monthlyPayment,
+            downPayment: downPayment,
+            lessorConfirmed: false
+        });
+    }
+
+    
+    function confirmLease (
+        uint256 carId
+    ) external onlyOwner {
+        // Verify the lease exists and needs to be confirmed
+        Lease memory currentLease = _leases[carId];
+        require(currentLease.lessor != address(0), "No lease found for this car");
+        require(currentLease.lessorConfirmed != true, "Lease has already been confirmed");
+        // Confirm the lease
+        currentLease.lessorConfirmed = true;
+        // Transfer NFT to lessee and release payment
+        safeTransferFrom(currentLease.lessor, currentLease.lessee, carId);
+        payable(currentLease.lessor).transfer(currentLease.downPayment + currentLease.monthlyPayment);
     }
 }
