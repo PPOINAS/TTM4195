@@ -6,25 +6,28 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 
-/** Notes for the developers:
+/**
+ * @title BilBoyd car rental company
+ * @author DUFFO Yann, GUYOT Tanguy, MONESTIER-MEZE Ilyan, POINAS Pierre
+ * @dev An example contract to demonstrate the principle of car rental via a smart contract for the TTM4195 course
+ * @notice This contract is untested
+ * @custom:experimental This is an experimental contract for the TTM4195 class.
  *
+ *
+ * Notes for the developers:
  * - 'onlyOwner' means that only the owner of the contrat can 
  *   call this function ;
  * - Storing the metadata on JSON outside the blockchain can drastically 
  *   reduce the gas used ;
  * - The current car lessee is represented by the current owner of the NFT ;
- */
-
-
-/** Useful documentations:
  *
+ *
+ * Useful documentations:
  * - https://docs.openzeppelin.com/contracts/5.x/erc721
  * - https://docs.openzeppelin.com/contracts/5.x/access-control
  * - https://github.com/OpenZeppelin/openzeppelin-contracts/tree/master/contracts
  * - https://docs.openzeppelin.com/contracts/5.x/api/utils
  */
-
-
 contract carForRent is ERC721, Ownable {
     constructor(address initialOwner) ERC721("carForRent", "CAR") Ownable(initialOwner) {}
 
@@ -36,7 +39,7 @@ contract carForRent is ERC721, Ownable {
         string color;
         uint16 yearOfMatriculation;
         uint256 originalValue;
-        uint256 mileage; // (A4Q2)
+        uint256 mileage;
     }
 
     // Mapping each carID to car struct containing all cars
@@ -51,7 +54,6 @@ contract carForRent is ERC721, Ownable {
     function carExists(uint256 carID) public view returns (bool) {
         return bytes(_cars[carID].model).length > 0;
     }
-
 
     /**
      * @notice Create a new car by minting an NFT
@@ -86,8 +88,6 @@ contract carForRent is ERC721, Ownable {
 
     /**
     * @notice Remove a car by burning the NFT
-    * @dev Remove a car by burning the NFT
-    * @param carID The unique ID of the car
     */
     function burn(uint256 carID) public onlyOwner {
         require(carExists(carID), "Car does not exist"); 
@@ -164,14 +164,7 @@ contract carForRent is ERC721, Ownable {
 
     mapping(uint256 => Lease) public _leases;
 
-    /**
-    @dev Initiate a lease for a car
-    @param carId The ID of the car to lease
-    @param driverExperience The years of possession of a driving license
-    @param mileageCap The mileage cap (fixed values)
-    @param contractDuration The duration of the contract (fixed values)
-    @param lessor The address of the lessor
-     */
+
     function initiateLease (
         uint256 carId,
         uint256 driverExperience,
@@ -194,21 +187,18 @@ contract carForRent is ERC721, Ownable {
         });
     }
 
-    /**
-    @dev Confirm a lease for a car
-    @param carID The ID of the car to lease
-    */
+    
     function confirmLease (
-        uint256 carID
+        uint256 carId
     ) external onlyOwner {
         // Verify the lease exists and needs to be confirmed
-        Lease memory currentLease = _leases[carID];
+        Lease memory currentLease = _leases[carId];
         require(currentLease.lessor != address(0), "No lease found for this car");
         require(currentLease.lessorConfirmed != true, "Lease has already been confirmed");
         // Confirm the lease
         currentLease.lessorConfirmed = true;
         // Transfer NFT to lessee and release payment
-        safeTransferFrom(currentLease.lessor, currentLease.lessee, carID);
+        safeTransferFrom(currentLease.lessor, currentLease.lessee, carId);
         payable(currentLease.lessor).transfer(currentLease.downPayment + currentLease.monthlyPayment);
     }
 }
