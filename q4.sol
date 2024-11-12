@@ -44,6 +44,8 @@ contract carForRent is ERC721, Ownable {
 
     // Mapping each carID to car struct containing all cars
     mapping(uint256 => Car) public _cars;
+    // Array to store all car IDs
+    uint256[] private carIDs;
 
     /**
      * @notice Checks if a car with the given ID exists in the `_cars` mapping.
@@ -82,18 +84,29 @@ contract carForRent is ERC721, Ownable {
             originalValue: originalValue,
             mileage: 0 // Initial mileage is set to 0 
         });
+        // Store the new car ID in the carIDs array
+        carIDs.push(carID);
         // Return the ID of the car (the NFT)
         return carID;
     }
 
     /**
-    * @notice Remove a car by burning the NFT
-    */
+     * @notice Remove a car by burning the NFT
+     */
     function burn(uint256 carID) public onlyOwner {
         require(carExists(carID), "Car does not exist"); 
         //TODO: changer le prochain requires avec la nouvelle structure de location
         //require(ownerOf(carID) == msg.sender, "ERROR: The car must not currently be rented, at the time of removal");
         delete _cars[carID];
+        // Remove the ID of `carIDs`
+        for (uint256 i = 0; i < carIDs.length; i++) {
+            if (carIDs[i] == carID) {
+                carIDs[i] = carIDs[carIDs.length - 1]; // Remplace l'ID par le dernier élément
+                carIDs.pop(); // Supprime le dernier élément
+                break;
+            }
+        }
+        // End by burning the NFT
         _burn(carID);
     }
     
@@ -105,6 +118,18 @@ contract carForRent is ERC721, Ownable {
     function getCarDetails(uint256 carID) public view returns (Car memory) {
         require(carExists(carID), "Car does not exist"); 
         return _cars[carID];
+    }
+
+    /**
+     * @notice Retrieve details of all cars.
+     * @return Car[] An array of Car structs containing the details of all cars
+     */
+    function getAllCars() public view returns (Car[] memory) {
+        Car[] memory allCars = new Car[](carIDs.length);
+        for (uint256 i = 0; i < carIDs.length; i++) {
+            allCars[i] = _cars[carIDs[i]];
+        }
+        return allCars;
     }
 
     /**
