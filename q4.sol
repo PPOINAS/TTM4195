@@ -189,21 +189,28 @@ contract carForRent is ERC721, Ownable {
 
     mapping(uint256 => Lease) public _leases;
 
-
+    /**
+     * @dev Initiate a lease for a car
+     * @param carID The ID of the car to lease
+     * @param driverExperience The years of possession of a driving license
+     * @param mileageCap The mileage cap (fixed values)
+     * @param contractDuration The duration of the contract (fixed values)
+     * @param lessor The address of the lessor
+     */
     function initiateLease (
-        uint256 carId,
+        uint256 carID,
         uint256 driverExperience,
         uint256 mileageCap,
         uint256 contractDuration,
         address lessor
     ) external payable {
         // Compute and verify payment amount
-        Car memory car = getCarDetails(carId);
+        Car memory car = getCarDetails(carID);
         uint256 monthlyPayment = calculateMonthlyQuota(car.originalValue, driverExperience, mileageCap, contractDuration);
         uint256 downPayment = 3*monthlyPayment;
         require(msg.value == monthlyPayment + downPayment, "Incorrect payment amount");
         // Creation of the lease
-        _leases[carId] = Lease({
+        _leases[carID] = Lease({
             lessee: msg.sender,
             lessor: lessor,
             monthlyPayment: monthlyPayment,
@@ -212,18 +219,21 @@ contract carForRent is ERC721, Ownable {
         });
     }
 
-    
+    /**
+     * @dev Confirm a lease for a car
+     * @param carID The ID of the car to lease
+     */
     function confirmLease (
-        uint256 carId
+        uint256 carID
     ) external onlyOwner {
         // Verify the lease exists and needs to be confirmed
-        Lease memory currentLease = _leases[carId];
+        Lease memory currentLease = _leases[carID];
         require(currentLease.lessor != address(0), "No lease found for this car");
         require(currentLease.lessorConfirmed != true, "Lease has already been confirmed");
         // Confirm the lease
         currentLease.lessorConfirmed = true;
         // Transfer NFT to lessee and release payment
-        safeTransferFrom(currentLease.lessor, currentLease.lessee, carId);
+        safeTransferFrom(currentLease.lessor, currentLease.lessee, carID);
         payable(currentLease.lessor).transfer(currentLease.downPayment + currentLease.monthlyPayment);
     }
 }
