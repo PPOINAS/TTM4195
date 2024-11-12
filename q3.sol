@@ -75,6 +75,7 @@ contract carForRent is ERC721, Ownable {
 
     /**
     * @dev Remove a car by burning the NFT
+    * @param carID The unique ID of the car
     */
     function burn(uint256 carID) public onlyOwner {
         require(ownerOf(carID) == msg.sender, "ERROR: The car must not currently be rented, at the time of removal");
@@ -144,13 +145,22 @@ contract carForRent is ERC721, Ownable {
         address lessor;
         uint256 monthlyPayment;
         uint256 downPayment;
+        uint256 contractDuration;
         bool lessorConfirmed;
+        uint256 lastPaymentDate;
     }
 
 
     mapping(uint256 => Lease) public _leases;
 
-
+    /**
+    @dev Initiate a lease for a car
+    @param carId The ID of the car to lease
+    @param driverExperience The years of possession of a driving license
+    @param mileageCap The mileage cap (fixed values)
+    @param contractDuration The duration of the contract (fixed values)
+    @param lessor The address of the lessor
+     */
     function initiateLease (
         uint256 carId,
         uint256 driverExperience,
@@ -173,18 +183,25 @@ contract carForRent is ERC721, Ownable {
         });
     }
 
-    
+    /**
+    @dev Confirm a lease for a car
+    @param carID The ID of the car to lease
+    */
     function confirmLease (
-        uint256 carId
+        uint256 carID
     ) external onlyOwner {
         // Verify the lease exists and needs to be confirmed
-        Lease memory currentLease = _leases[carId];
+        Lease memory currentLease = _leases[carID];
         require(currentLease.lessor != address(0), "No lease found for this car");
         require(currentLease.lessorConfirmed != true, "Lease has already been confirmed");
         // Confirm the lease
         currentLease.lessorConfirmed = true;
         // Transfer NFT to lessee and release payment
-        safeTransferFrom(currentLease.lessor, currentLease.lessee, carId);
+        safeTransferFrom(currentLease.lessor, currentLease.lessee, carID);
         payable(currentLease.lessor).transfer(currentLease.downPayment + currentLease.monthlyPayment);
     }
 }
+
+ // q4
+
+    
