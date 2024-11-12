@@ -166,26 +166,26 @@ contract carForRent is ERC721, Ownable {
 
     /**
     @dev Initiate a lease for a car
-    @param carId The ID of the car to lease
+    @param carID The ID of the car to lease
     @param driverExperience The years of possession of a driving license
     @param mileageCap The mileage cap (fixed values)
     @param contractDuration The duration of the contract (fixed values)
     @param lessor The address of the lessor
      */
     function initiateLease (
-        uint256 carId,
+        uint256 carID,
         uint256 driverExperience,
         uint256 mileageCap,
         uint256 contractDuration,
         address lessor
     ) external payable {
         // Compute and verify payment amount
-        Car memory car = getCarDetails(carId);
+        Car memory car = getCarDetails(carID);
         uint256 monthlyPayment = calculateMonthlyQuota(car.originalValue, driverExperience, mileageCap, contractDuration);
         uint256 downPayment = 3*monthlyPayment;
         require(msg.value == monthlyPayment + downPayment, "Incorrect payment amount");
         // Creation of the lease
-        _leases[carId] = Lease({
+        _leases[carID] = Lease({
             lessee: msg.sender,
             lessor: lessor,
             monthlyPayment: monthlyPayment,
