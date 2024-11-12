@@ -101,7 +101,7 @@ contract carForRent is ERC721, Ownable {
      * @return car The car struct containing all details
      */
     function getCarDetails(uint256 carID) public view returns (Car memory) {
-        //require(_exists(carID), "Car does not exist"); // TODO: régler le problème avec '_exists'
+        require(carExists(carID), "Car does not exist"); 
         return _cars[carID];
     }
 
