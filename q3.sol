@@ -43,8 +43,19 @@ contract carForRent is ERC721, Ownable {
     mapping(uint256 => Car) public _cars;
 
     /**
-     * @dev Create a new car by minting an NFT
-     * @notice Initially, no lessee is assigned. It is going to be the compagny.
+     * @notice Checks if a car with the given ID exists in the `_cars` mapping.
+     * @dev Uses the `model` property to determine existence; if `model` is an empty string, the car does not exist.
+     * @param carID The unique identifier of the car to check in the `_cars` mapping.
+     * @return bool Returns `true` if the car exists, `false` if it does not.
+     */
+    function carExists(uint256 carID) public view returns (bool) {
+        return bytes(_cars[carID].model).length > 0;
+    }
+
+
+    /**
+     * @notice Create a new car by minting an NFT
+     * @dev Initially, no lessee is assigned. It is going to be the compagny.
      * @param model The model of the car
      * @param color The color of the car
      * @param yearOfMatriculation The year the car was manufactured
@@ -74,17 +85,18 @@ contract carForRent is ERC721, Ownable {
     }
 
     /**
-    * @dev Remove a car by burning the NFT
+    * @notice Remove a car by burning the NFT
     */
     function burn(uint256 carID) public onlyOwner {
-        require(ownerOf(carID) == msg.sender, "ERROR: The car must not currently be rented, at the time of removal");
-        //require(_exists(carID), "Car does not exist"); // TODO: régler le problème avec '_exists'
+        require(carExists(carID), "Car does not exist"); 
+        //TODO: changer le prochain requires avec la nouvelle structure de location
+        //require(ownerOf(carID) == msg.sender, "ERROR: The car must not currently be rented, at the time of removal");
         delete _cars[carID];
         _burn(carID);
     }
     
     /**
-     * @dev Retrieve details of a car by its carID.
+     * @notice Retrieve details of a car by its carID.
      * @param carID The unique ID of the car
      * @return car The car struct containing all details
      */
@@ -94,7 +106,7 @@ contract carForRent is ERC721, Ownable {
     }
 
     /**
-     * @dev Calculate the monthly quota for renting the car.
+     * @notice Calculate the monthly quota for renting the car.
      * @param carOriginalValue The original value of the car
      * @param driverExperience Years of possession of a driving license
      * @param mileageCap The mileage cap (fixed values)
