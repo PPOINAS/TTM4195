@@ -241,7 +241,7 @@ contract carForRent is ERC721, Ownable {
         uint256 carId
     ) external OnlyLessor {
         // Verify the lease exists and needs to be confirmed
-        Lease memory currentLease = _leases[carId];
+        Lease storage currentLease = _leases[carId];
         require(currentLease.lessee != address(0), "No lease found for this car");
         require(currentLease.state == LeaseState.Created, "Lease has already been confirmed");
         // Confirm the lease
@@ -254,7 +254,7 @@ contract carForRent is ERC721, Ownable {
     function makeMonthlyPayment (
         uint256 carId
     ) external payable {
-        Lease memory currentLease = _leases[carId];
+        Lease storage currentLease = _leases[carId];
         require(currentLease.lessee != address(0), "No lease found for this car");
         require(currentLease.state == LeaseState.Running, "Lease has not been confirmed yet");
         require(msg.sender == currentLease.lessee, "Only the lessee can make a payment");
@@ -294,7 +294,7 @@ contract carForRent is ERC721, Ownable {
     function checkMonthlyPayment (
         uint256 carId
     ) external OnlyLessor returns (PaymentState state) {
-        Lease memory currentLease = _leases[carId];
+        Lease storage currentLease = _leases[carId];
         require(currentLease.lessee != address(0), "No lease found for this car");
         require(currentLease.state == LeaseState.Running, "Lease has not been confirmed yet");
         if (block.timestamp > currentLease.nextPaymentDueDate) {
@@ -313,7 +313,7 @@ contract carForRent is ERC721, Ownable {
     // Function to repossess the NFT
     function repossessNFT(
         uint256 carId,
-        Lease memory currentLease
+        Lease storage currentLease
     ) internal {
         currentLease.state = LeaseState.Inactive;
 
