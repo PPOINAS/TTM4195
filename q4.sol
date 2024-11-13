@@ -182,8 +182,8 @@ contract carForRent is ERC721, Ownable {
 
     enum LeaseState {Created, Running, Inactive}
     enum PaymentState {Late, OnTime, Missed}
-    uint256 public lateFee;
-    uint256 public maxMissedPaymentsAllowed;
+    uint256 public lateFee = 10;
+    uint256 public maxMissedPaymentsAllowed = 3;
 
     struct Lease {
         address lessee;
