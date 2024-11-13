@@ -31,11 +31,8 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 contract carForRent is ERC721, Ownable {
     using Counters for Counters.Counter;
     Counters.Counter private _carIDCounter;
-    address payable public lessor;
 
-    constructor(address initialOwner) ERC721("carForRent", "CAR") Ownable(initialOwner) {
-        lessor = payable(initialOwner);
-    }
+    constructor(address initialOwner) ERC721("carForRent", "CAR") Ownable(initialOwner) {}
 
     struct Car {
         string model;
@@ -196,11 +193,6 @@ contract carForRent is ERC721, Ownable {
         
     }
 
-    modifier OnlyLessor () {
-        require ( msg.sender == lessor , "Only lessor can call this.");
-        _;
-    }
-
     mapping(uint256 => Lease) public _leases;
 
     /**
@@ -239,7 +231,7 @@ contract carForRent is ERC721, Ownable {
      */
     function confirmLease (
         uint256 carId
-    ) external OnlyLessor {
+    ) external onlyOwner {
         // Verify the lease exists and needs to be confirmed
         Lease storage currentLease = _leases[carId];
         require(currentLease.lessee != address(0), "No lease found for this car");
@@ -247,8 +239,8 @@ contract carForRent is ERC721, Ownable {
         // Confirm the lease
         currentLease.state = LeaseState.Running;
         // Transfer NFT to lessee and release payment
-        safeTransferFrom(lessor, currentLease.lessee, carId);
-        lessor.transfer(currentLease.downPayment + currentLease.monthlyPayment);
+        safeTransferFrom(owner(), currentLease.lessee, carId);
+        payable(owner()).transfer(currentLease.downPayment + currentLease.monthlyPayment);
     }
 
     function makeMonthlyPayment (
@@ -279,8 +271,8 @@ contract carForRent is ERC721, Ownable {
         // Ensure payment is sufficient
         require(msg.value >= requiredPayment, "Insufficient payment, including any late fee");
 
-        // Transfer payment to the lessor
-        lessor.transfer(requiredPayment);
+        // Transfer payment to the owner
+        payable(owner()).transfer(requiredPayment);
 
         // Update the due date for the next payment
         currentLease.nextPaymentDueDate += 30 days;
@@ -293,8 +285,8 @@ contract carForRent is ERC721, Ownable {
 
     function checkMonthlyPayment (
         uint256 carId
-    ) external OnlyLessor returns (PaymentState state) {
-        Lease storage currentLease = _leases[carId];
+    ) external onlyOwner returns (PaymentState state) {
+        Lease memory currentLease = _leases[carId];
         require(currentLease.lessee != address(0), "No lease found for this car");
         require(currentLease.state == LeaseState.Running, "Lease has not been confirmed yet");
         if (block.timestamp > currentLease.nextPaymentDueDate) {
@@ -317,8 +309,8 @@ contract carForRent is ERC721, Ownable {
     ) internal {
         currentLease.state = LeaseState.Inactive;
 
-        // Transfer the NFT back to the lessor
-        safeTransferFrom(currentLease.lessee, lessor, carId);
+        // Transfer the NFT back to the owner
+        safeTransferFrom(currentLease.lessee, owner(), carId);
 
         // Reset missed payments for record-keeping purposes
         currentLease.consecutiveMissedPayments = 0;
