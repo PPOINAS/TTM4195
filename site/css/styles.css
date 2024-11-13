@@ -1,0 +1,23 @@
+body {
+    margin : 0;
+    padding : 0;
+}
+
+header {
+    width: 100%;
+}
+
+header nav {
+    display: flex;
+    justify-content: space-between;
+}
+
+header nav a {
+    text-decoration: none;
+    padding: 15px;
+    font-size: 1.2em;
+}
+
+main {
+    margin: 10px;
+}

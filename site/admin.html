@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bilboyd Rentals - Admin Panel</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <a href="index.html">BilBoyd Car Rentals</a>
+            <a href="index.html">Customer interface</a>
+        </nav>
+    </header>
+
+    <main>
+        <h1>Bilboyd Car Rental Admin Panel</h1>
+
+        <button onclick="connectWallet()">Connect Wallet</button>
+        <p id="walletAddress">Wallet not connected</p>
+    
+        <h2>Create a New Car</h2>
+        <form id="carForm" onsubmit="submitCarForm(event)">
+            <input type="text" id="model" placeholder="Model" required>
+            <input type="text" id="color" placeholder="Color" required>
+            <input type="number" id="year" placeholder="Year of Matriculation" required>
+            <input type="number" id="value" placeholder="Original Value" required step="any"> <!-- step="any" to allow float numbers-->
+            <button type="submit">Create Car</button>
+        </form>
+    
+        <h2>Car List</h2>
+        <button onclick="loadCars()">Load Car List</button>
+        <div id="carList"></div>
+    
+        <h2>Confirm Lease</h2>
+        <form id="confirmLeaseForm" onsubmit="submitConfirmLeaseForm(event)">
+            <input type="number" id="confirmCarId" placeholder="Car ID" required>
+            <button type="submit">Confirm Lease</button>
+        </form>
+
+        <h2>Car owners</h2>
+        <button onclick="loadCarsWithOwners()">Load Car owners</button>
+        <div id="carOwners"></div>
+    </main>
+
+    <script src="script.js" type="module"></script>
+</body>
+</html>

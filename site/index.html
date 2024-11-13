@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bilboyd Rentals</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header>
+      <nav>
+        <a href="index.html">BilBoyd Car Rentals</a>
+        <a href="admin.html">Admin panel</a>
+      </nav>
+    </header>
+    <main>
+      <h1>Bilboyd Car Rental Client Interface</h1>
+
+      <button onclick="connectWallet()">Connect Wallet</button>
+      <p id="walletAddress">Wallet not connected</p>
+      
+      <h2>Car List</h2>
+      <button onclick="loadCars()">Load Car List</button>
+      <div id="carList"></div>
+  
+      <h2>Lease a Car</h2>
+      <form id="leaseForm" onsubmit="submitLeaseForm(event)">
+          <input type="number" id="carId" placeholder="CarId of the selected car" required>
+          <input type="number" id="driverExperience" placeholder="Driver Experience (years)" required>
+          <input type="number" id="mileageCap" placeholder="Mileage Cap" required>
+          <input type="number" id="contractDuration" placeholder="Contract Duration (months)" required>
+          <button type="submit">Lease Car</button>
+      </form>
+    </main>
+    
+    <script src="script.js" type="module"></script>
+</body>
+</html>
+
