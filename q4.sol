@@ -179,8 +179,8 @@ contract carForRent is ERC721, Ownable {
 
     enum LeaseState {Created, Running, Inactive}
     enum PaymentState {Late, OnTime, Missed}
-    uint256 public lateFee;
-    uint256 public maxMissedPaymentsAllowed;
+    uint256 public lateFee = 100; // GWei
+    uint256 public maxMissedPaymentsAllowed = 3;
 
     struct Lease {
         address lessee;
@@ -188,7 +188,6 @@ contract carForRent is ERC721, Ownable {
         uint256 downPayment;
         LeaseState state;
         uint256 nextPaymentDueDate;
-        uint256 terminationGracePeriod;
         uint256 consecutiveMissedPayments;
         
     }
@@ -196,7 +195,7 @@ contract carForRent is ERC721, Ownable {
     mapping(uint256 => Lease) public _leases;
 
     /**
-     * @dev Initiate a lease for a car
+     * @notice Initiate a lease for a car
      * @param carID The ID of the car to lease
      * @param driverExperience The years of possession of a driving license
      * @param mileageCap The mileage cap (fixed values)
@@ -219,14 +218,13 @@ contract carForRent is ERC721, Ownable {
             monthlyPayment: monthlyPayment,
             downPayment: downPayment,
             state: LeaseState.Created,
-            nextPaymentDueDate: block.timestamp + 30 days,
-            terminationGracePeriod: 60 days,
+            nextPaymentDueDate: (contractDuration <= 1) ? type(uint256).max : (block.timestamp + 30 days),
             consecutiveMissedPayments: 0
         });
     }
 
     /**
-     * @dev Confirm a lease for a car
+     * @notice Confirm a lease for a car
      * @param carId The ID of the car to lease
      */
     function confirmLease (
@@ -243,60 +241,54 @@ contract carForRent is ERC721, Ownable {
         payable(owner()).transfer(currentLease.downPayment + currentLease.monthlyPayment);
     }
 
+    /**
+     * @notice Lessee interface for monthly payments
+     * @param carId The ID of the leased car
+     */
     function makeMonthlyPayment (
         uint256 carId
     ) external payable {
+        // Retrieve the lease associated with the car
         Lease storage currentLease = _leases[carId];
+        // Requirements
         require(currentLease.lessee != address(0), "No lease found for this car");
         require(currentLease.state == LeaseState.Running, "Lease has not been confirmed yet");
         require(msg.sender == currentLease.lessee, "Only the lessee can make a payment");
-
+        // Use cases by date
         uint256 requiredPayment = currentLease.monthlyPayment;
-
         if (block.timestamp > currentLease.nextPaymentDueDate) {
             // Apply late fee if overdue but within the grace period
-            if (block.timestamp <= currentLease.nextPaymentDueDate + currentLease.terminationGracePeriod) {
-                requiredPayment += lateFee;
-                currentLease.consecutiveMissedPayments += 1;
-            } else {
-                // Terminate and repossess if payment overdue beyond grace period
-                repossessNFT(carId, currentLease);
-                return;
-            }
+            requiredPayment += lateFee;
+            currentLease.consecutiveMissedPayments += 1;
         } else {
             // Reset missed payment count if paid on time
             currentLease.consecutiveMissedPayments = 0;
         }
-
         // Ensure payment is sufficient
         require(msg.value >= requiredPayment, "Insufficient payment, including any late fee");
-
         // Transfer payment to the owner
         payable(owner()).transfer(requiredPayment);
-
         // Update the due date for the next payment
         currentLease.nextPaymentDueDate += 30 days;
-
-        // Check if missed payment threshold has been exceeded
-        if (currentLease.consecutiveMissedPayments >= maxMissedPaymentsAllowed) {
-            repossessNFT(carId, currentLease);
-        }
     }
 
+    /**
+     *@notice Company interface to check payments made
+     *@param carId The ID of the leased car
+     */
     function checkMonthlyPayment (
         uint256 carId
     ) external onlyOwner returns (PaymentState state) {
         Lease storage currentLease = _leases[carId];
         require(currentLease.lessee != address(0), "No lease found for this car");
         require(currentLease.state == LeaseState.Running, "Lease has not been confirmed yet");
-        if (block.timestamp > currentLease.nextPaymentDueDate) {
-            if (block.timestamp <= currentLease.nextPaymentDueDate + currentLease.terminationGracePeriod) {
-                return PaymentState.Late;
-            } else {
-                // Terminate and repossess if payment overdue beyond grace period
-                repossessNFT(carId, currentLease);
-                return PaymentState.Missed;
-            }
+        // Check if missed payment threshold has been exceeded
+        if ((block.timestamp > currentLease.nextPaymentDueDate + 60 days) || (currentLease.consecutiveMissedPayments >= maxMissedPaymentsAllowed)) {
+            repossessNFT(carId, currentLease);
+            return PaymentState.Missed;
+        }
+        else if (block.timestamp > currentLease.nextPaymentDueDate) {
+            return PaymentState.Late;
         } else {
             return PaymentState.OnTime;
         }
