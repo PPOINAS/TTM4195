@@ -286,7 +286,7 @@ contract carForRent is ERC721, Ownable {
     function checkMonthlyPayment (
         uint256 carId
     ) external onlyOwner returns (PaymentState state) {
-        Lease memory currentLease = _leases[carId];
+        Lease storage currentLease = _leases[carId];
         require(currentLease.lessee != address(0), "No lease found for this car");
         require(currentLease.state == LeaseState.Running, "Lease has not been confirmed yet");
         if (block.timestamp > currentLease.nextPaymentDueDate) {
