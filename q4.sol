@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT 
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
@@ -29,10 +29,13 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
  * - https://docs.openzeppelin.com/contracts/5.x/api/utils
  */
 contract carForRent is ERC721, Ownable {
-    constructor(address initialOwner) ERC721("carForRent", "CAR") Ownable(initialOwner) {}
-
     using Counters for Counters.Counter;
     Counters.Counter private _carIDCounter;
+    address payable public lessor;
+
+    constructor(address initialOwner) ERC721("carForRent", "CAR") Ownable(initialOwner) {
+        lessor = payable(initialOwner);
+    }
 
     struct Car {
         string model;
@@ -177,15 +180,26 @@ contract carForRent is ERC721, Ownable {
         return monthlyQuota;
     }
 
+    enum LeaseState {Created, Running, Inactive}
+    enum PaymentState {Late, OnTime, Missed}
+    uint256 public lateFee;
+    uint256 public maxMissedPaymentsAllowed;
 
     struct Lease {
         address lessee;
-        address lessor;
         uint256 monthlyPayment;
         uint256 downPayment;
-        bool lessorConfirmed;
+        LeaseState state;
+        uint256 nextPaymentDueDate;
+        uint256 terminationGracePeriod;
+        uint256 consecutiveMissedPayments;
+        
     }
 
+    modifier OnlyLessor () {
+        require ( msg.sender == lessor , "Only lessor can call this.");
+        _;
+    }
 
     mapping(uint256 => Lease) public _leases;
 
@@ -195,14 +209,12 @@ contract carForRent is ERC721, Ownable {
      * @param driverExperience The years of possession of a driving license
      * @param mileageCap The mileage cap (fixed values)
      * @param contractDuration The duration of the contract (fixed values)
-     * @param lessor The address of the lessor
      */
     function initiateLease (
         uint256 carID,
         uint256 driverExperience,
         uint256 mileageCap,
-        uint256 contractDuration,
-        address lessor
+        uint256 contractDuration
     ) external payable {
         // Compute and verify payment amount
         Car memory car = getCarDetails(carID);
@@ -212,28 +224,103 @@ contract carForRent is ERC721, Ownable {
         // Creation of the lease
         _leases[carID] = Lease({
             lessee: msg.sender,
-            lessor: lessor,
             monthlyPayment: monthlyPayment,
             downPayment: downPayment,
-            lessorConfirmed: false
+            state: LeaseState.Created,
+            nextPaymentDueDate: block.timestamp + 30 days,
+            terminationGracePeriod: 60 days,
+            consecutiveMissedPayments: 0
         });
     }
 
     /**
      * @dev Confirm a lease for a car
-     * @param carID The ID of the car to lease
+     * @param carId The ID of the car to lease
      */
     function confirmLease (
-        uint256 carID
-    ) external onlyOwner {
+        uint256 carId
+    ) external OnlyLessor {
         // Verify the lease exists and needs to be confirmed
-        Lease memory currentLease = _leases[carID];
-        require(currentLease.lessor != address(0), "No lease found for this car");
-        require(currentLease.lessorConfirmed != true, "Lease has already been confirmed");
+        Lease memory currentLease = _leases[carId];
+        require(currentLease.lessee != address(0), "No lease found for this car");
+        require(currentLease.state == LeaseState.Created, "Lease has already been confirmed");
         // Confirm the lease
-        currentLease.lessorConfirmed = true;
+        currentLease.state = LeaseState.Running;
         // Transfer NFT to lessee and release payment
-        safeTransferFrom(currentLease.lessor, currentLease.lessee, carID);
-        payable(currentLease.lessor).transfer(currentLease.downPayment + currentLease.monthlyPayment);
+        safeTransferFrom(lessor, currentLease.lessee, carId);
+        lessor.transfer(currentLease.downPayment + currentLease.monthlyPayment);
+    }
+
+    function makeMonthlyPayment (
+        uint256 carId
+    ) external payable {
+        Lease memory currentLease = _leases[carId];
+        require(currentLease.lessee != address(0), "No lease found for this car");
+        require(currentLease.state == LeaseState.Running, "Lease has not been confirmed yet");
+        require(msg.sender == currentLease.lessee, "Only the lessee can make a payment");
+
+        uint256 requiredPayment = currentLease.monthlyPayment;
+
+        if (block.timestamp > currentLease.nextPaymentDueDate) {
+            // Apply late fee if overdue but within the grace period
+            if (block.timestamp <= currentLease.nextPaymentDueDate + currentLease.terminationGracePeriod) {
+                requiredPayment += lateFee;
+                currentLease.consecutiveMissedPayments += 1;
+            } else {
+                // Terminate and repossess if payment overdue beyond grace period
+                repossessNFT(carId, currentLease);
+                return;
+            }
+        } else {
+            // Reset missed payment count if paid on time
+            currentLease.consecutiveMissedPayments = 0;
+        }
+
+        // Ensure payment is sufficient
+        require(msg.value >= requiredPayment, "Insufficient payment, including any late fee");
+
+        // Transfer payment to the lessor
+        lessor.transfer(requiredPayment);
+
+        // Update the due date for the next payment
+        currentLease.nextPaymentDueDate += 30 days;
+
+        // Check if missed payment threshold has been exceeded
+        if (currentLease.consecutiveMissedPayments >= maxMissedPaymentsAllowed) {
+            repossessNFT(carId, currentLease);
+        }
+    }
+
+    function checkMonthlyPayment (
+        uint256 carId
+    ) external OnlyLessor returns (PaymentState state) {
+        Lease memory currentLease = _leases[carId];
+        require(currentLease.lessee != address(0), "No lease found for this car");
+        require(currentLease.state == LeaseState.Running, "Lease has not been confirmed yet");
+        if (block.timestamp > currentLease.nextPaymentDueDate) {
+            if (block.timestamp <= currentLease.nextPaymentDueDate + currentLease.terminationGracePeriod) {
+                return PaymentState.Late;
+            } else {
+                // Terminate and repossess if payment overdue beyond grace period
+                repossessNFT(carId, currentLease);
+                return PaymentState.Missed;
+            }
+        } else {
+            return PaymentState.OnTime;
+        }
+    }
+
+    // Function to repossess the NFT
+    function repossessNFT(
+        uint256 carId,
+        Lease memory currentLease
+    ) internal {
+        currentLease.state = LeaseState.Inactive;
+
+        // Transfer the NFT back to the lessor
+        safeTransferFrom(currentLease.lessee, lessor, carId);
+
+        // Reset missed payments for record-keeping purposes
+        currentLease.consecutiveMissedPayments = 0;
     }
 }
