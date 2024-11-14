@@ -95,8 +95,8 @@ contract carForRent is ERC721, Ownable {
      */
     function burn(uint256 carID) public onlyOwner {
         require(carExists(carID), "Car does not exist"); 
-        //TODO: changer le prochain requires avec la nouvelle structure de location
-        //require(ownerOf(carID) == msg.sender, "ERROR: The car must not currently be rented, at the time of removal");
+        require(_leases[carID].state == LeaseState.Inactive, "Car is currently rented, it can't be destructed");
+        delete _leases[carID];
         delete _cars[carID];
         // Remove the ID of `carIDs`
         for (uint256 i = 0; i < carIDs.length; i++) {
