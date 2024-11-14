@@ -415,7 +415,7 @@ contract carForRent is ERC721, Ownable {
      * @dev The recalculation is done based on updated parameters (e.g., depreciation of car value).
      * @param carId The ID of the car for which the lease is being extended.
      */
-    function extendLease(uint256 carId, uint256 distanceTravelled) public payable {
+    function extendLease(uint256 carId, uint256 distanceTravelled, uint256 newDriverExperience) public payable {
         // Retrieving the lease associated with the car
         Lease storage currentLease = _leases[carId];
         // Requirements
@@ -424,10 +424,10 @@ contract carForRent is ERC721, Ownable {
         // Update mileage before extending lease
         updateMileage(carId, distanceTravelled);
         // Updating the lease
-        currentLease.driverExperience += 1;
+        currentLease.driverExperience += newDriverExperience;
         // Recalculate monthly amount
         uint256 monthlyPayment = calculateMonthlyQuota(carId, 
-                                                       currentLease.driverExperience, 
+                                                       newDriverExperience, 
                                                        currentLease.mileageCap, 
                                                        12);
         require(msg.value >= monthlyPayment, "Incorrect payment amount");
@@ -450,13 +450,11 @@ contract carForRent is ERC721, Ownable {
         uint256 oldCarId, 
         uint256 distanceTravelled,
         uint256 newCarId,
+        uint256 newDriverExperience,
         uint256 newMileageCap,
         uint256 newContractDuration
     ) public payable {
         terminateLease(oldCarId, distanceTravelled);
-        // Retrieving the lease associated with the car
-        Lease storage oldLease = _leases[oldCarId];
-        uint256 driverExperience = oldLease.driverExperience + (oldLease.contractDuration / 12);
-        initiateLease(newCarId, driverExperience, newMileageCap, newContractDuration);
+        initiateLease(newCarId, newDriverExperience, newMileageCap, newContractDuration);
     }
 }
