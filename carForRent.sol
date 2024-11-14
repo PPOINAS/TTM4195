@@ -89,6 +89,8 @@ contract carForRent is ERC721, Ownable {
         return bytes(_cars[carID].model).length > 0;
     }
 
+    // Q1
+
     /**
      * @notice Create a new car by minting an NFT
      * @dev Initially, no lessee is assigned. It is going to be the compagny.
@@ -168,6 +170,8 @@ contract carForRent is ERC721, Ownable {
         return allCars;
     }
 
+    // Q2
+
     /**
      * @notice Calculate the monthly quota for renting the car.
      * @param carID The unique ID of the car
@@ -216,6 +220,8 @@ contract carForRent is ERC721, Ownable {
         // Return value
         return monthlyQuota;
     }
+
+    // Q3
 
     /**
      * @notice Initiate a lease for a car
@@ -268,6 +274,8 @@ contract carForRent is ERC721, Ownable {
         // Transfer NFT to lessee and release payment
         approve(currentLease.lessee, carId);
     }
+
+    // Q4
 
     /**
      * @notice Valide the lease for a car, client side
@@ -397,6 +405,10 @@ contract carForRent is ERC721, Ownable {
         _cars[carId].mileage += distanceTravelled;
     }
 
+    // Q5
+
+    // a)
+
     /**
      * @notice Terminates the lease and returns the car to the owner.
      * @param carId The ID of the leased car.
@@ -417,6 +429,8 @@ contract carForRent is ERC721, Ownable {
         safeTransferFrom(msg.sender, owner(), carId);
     }
 
+    // b)
+
     /**
      * @notice Extends the lease by one year and recalculates the monthly amount in the lessee's favor
      * @dev The recalculation is done based on updated parameters (e.g., depreciation of car value)
@@ -436,6 +450,7 @@ contract carForRent is ERC721, Ownable {
         // Requirements
         require(currentLease.lessee == msg.sender, "Only the lessee can extend the lease");
         require(currentLease.state == LeaseState.Running, "Lease is not active");
+        require(block.timestamp >= currentLease.startingDay + currentLease.contractDuration, "Lease duration has not ended yet");
         // Update mileage before extending lease
         updateMileage(carId, distanceTravelled);
         // Updating the lease
@@ -452,6 +467,8 @@ contract carForRent is ERC721, Ownable {
         currentLease.consecutiveMissedPayments = 0;
         currentLease.contractDuration = 12;
     }
+
+    // c) 
 
     /**
      * @notice Terminate the current lease and sign for a new one
