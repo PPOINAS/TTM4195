@@ -406,7 +406,7 @@ contract carForRent is ERC721, Ownable {
     /**
      * @notice Company interface to check payments made
      * @param carID The ID of the leased car
-     * @return PaymentState The current payment state
+     * @return state The current payment state
      */
     function checkMonthlyPayment(
         uint256 carID
