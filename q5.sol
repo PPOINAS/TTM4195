@@ -266,7 +266,7 @@ contract carForRent is ERC721, Ownable {
      * @notice Valide the lease for a car, client side
      * @param carId The ID of the car to lease
      */
-    function validateLease(uint256 carId) external payable {
+    function validateLease(uint256 carId) external {
         // Retrieving the lease associated with the car
         Lease storage currentLease = _leases[carId];
         // Requirements
