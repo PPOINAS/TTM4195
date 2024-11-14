@@ -430,7 +430,7 @@ contract carForRent is ERC721, Ownable {
                                                        currentLease.driverExperience, 
                                                        currentLease.mileageCap, 
                                                        12);
-        require(msg.value == monthlyPayment, "Incorrect payment amount");
+        require(msg.value >= monthlyPayment, "Incorrect payment amount");
         // Updating the other terms of the lease
         currentLease.monthlyPayment = monthlyPayment;
         currentLease.nextPaymentDueDate = block.timestamp + 30 days;
