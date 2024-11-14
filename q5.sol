@@ -205,6 +205,7 @@ contract carForRent is ERC721, Ownable {
         uint256 contractDuration; // months
         uint256 driverExperience; // years
         uint256 mileageCap; // km
+        uint256 startingDay;
     }
 
     mapping(uint256 => Lease) public _leases;
@@ -239,7 +240,8 @@ contract carForRent is ERC721, Ownable {
             consecutiveMissedPayments: 0,
             contractDuration: contractDuration,
             driverExperience: driverExperience,
-            mileageCap: mileageCap
+            mileageCap: mileageCap,
+            startingDay: block.timestamp
         });
     }
 
@@ -399,7 +401,7 @@ contract carForRent is ERC721, Ownable {
         // Requirements
         require(currentLease.lessee == msg.sender, "Only the lessee can end the lease");
         require(currentLease.state == LeaseState.Running, "Lease is not active");
-        require(block.timestamp >= currentLease.contractDuration, "Lease duration has not ended yet");
+        require(block.timestamp >= currentLease.startingDay + currentLease.contractDuration, "Lease duration has not ended yet");
         // Update mileage before terminating lease
         updateMileage(carId, distanceTravelled);
         // Change lease state to Inactive
