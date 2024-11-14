@@ -257,7 +257,7 @@ contract carForRent is ERC721, Ownable {
         // Confirm the lease by passing currentLease.state from 'Created' to 'Running'
         currentLease.state = LeaseState.Confirmed;
         // Transfer NFT to lessee and release payment
-        setApprovalForAll(currentLease.lessee, true);
+        approve(currentLease.lessee, carId);
     }
 
     /**
@@ -276,7 +276,7 @@ contract carForRent is ERC721, Ownable {
         payable(owner()).transfer(
             currentLease.downPayment + currentLease.monthlyPayment
         );
-        setApprovalForAll(owner(), true);
+        approve(owner(), carId);
     }
 
     /**
