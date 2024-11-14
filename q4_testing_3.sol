@@ -186,6 +186,7 @@ contract carForRent is ERC721, Ownable {
 
     enum LeaseState {
         Created,
+        Confirmed,
         Running,
         Inactive
     }
@@ -262,15 +263,30 @@ contract carForRent is ERC721, Ownable {
         );
         require(
             currentLease.state == LeaseState.Created,
-            "Lease has already been confirmed"
+            "Lease is not in the right state"
         );
         // Confirm the lease by passing currentLease.state from 'Created' to 'Running'
+        currentLease.state = LeaseState.Confirmed;
+
+        setApprovalForAll(currentLease.lessee, true);
+    }
+
+    function validateLease(uint256 carId) external {
+        Lease storage currentLease = _leases[carId];
+        require(
+            currentLease.lessee != address(0),
+            "No lease found for this car"
+        );
+        require(
+            currentLease.state == LeaseState.Confirmed,
+            "Lease is not in the right state"
+        );
         currentLease.state = LeaseState.Running;
-        // Transfer NFT to lessee and release payment
         safeTransferFrom(owner(), currentLease.lessee, carId);
         payable(owner()).transfer(
             currentLease.downPayment + currentLease.monthlyPayment
         );
+        setApprovalForAll(owner(), true);
     }
 
     /**
