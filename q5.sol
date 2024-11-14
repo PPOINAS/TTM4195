@@ -180,8 +180,17 @@ contract carForRent is ERC721, Ownable {
         return monthlyQuota;
     }
 
-    enum LeaseState {Inactive, Created, Running}
-    enum PaymentState {Late, OnTime, Missed}
+    enum LeaseState {
+        Inactive, 
+        Created, 
+        Confirmed, 
+        Running
+    }
+    enum PaymentState {
+        Late, 
+        OnTime, 
+        Missed
+    }
     uint256 public lateFee = 100; // Wei
     uint256 public maxMissedPaymentsAllowed = 3;
 
@@ -192,6 +201,7 @@ contract carForRent is ERC721, Ownable {
         LeaseState state;
         uint256 nextPaymentDueDate;
         uint256 consecutiveMissedPayments;
+        PaymentState lastPaymentStatut;
         uint256 contractDuration; // months
         uint256 driverExperience; // years
         uint256 mileageCap; // km
@@ -225,6 +235,7 @@ contract carForRent is ERC721, Ownable {
             downPayment: downPayment,
             state: LeaseState.Created,
             nextPaymentDueDate: (contractDuration <= 1) ? type(uint256).max : (block.timestamp + 30 days),
+            lastPaymentStatut: PaymentState.OnTime,
             consecutiveMissedPayments: 0,
             contractDuration: contractDuration,
             driverExperience: driverExperience,
@@ -233,7 +244,7 @@ contract carForRent is ERC721, Ownable {
     }
 
     /**
-     * @notice Confirm a lease for a car
+     * @notice Confirm a lease for a car, BilBoyd side
      * @param carId The ID of the car to lease
      */
     function confirmLease (
@@ -242,12 +253,60 @@ contract carForRent is ERC721, Ownable {
         // Verify the lease exists and needs to be confirmed
         Lease storage currentLease = _leases[carId];
         require(currentLease.lessee != address(0), "No lease found for this car");
-        require(currentLease.state == LeaseState.Created, "Lease has already been confirmed");
-        // Confirm the lease
-        currentLease.state = LeaseState.Running;
+        require(currentLease.state == LeaseState.Created, "Lease is not in the right state");
+        // Confirm the lease by passing currentLease.state from 'Created' to 'Running'
+        currentLease.state = LeaseState.Confirmed;
         // Transfer NFT to lessee and release payment
+        setApprovalForAll(currentLease.lessee, true);
+    }
+
+    /**
+     * @notice Valide the lease for a car, client side
+     * @param carId The ID of the car to lease
+     */
+    function validateLease(uint256 carId) external {
+        // Retrieving the lease associated with the car
+        Lease storage currentLease = _leases[carId];
+        // Requirements
+        require(currentLease.lessee != address(0), "No lease found for this car");
+        require(currentLease.state == LeaseState.Confirmed, "Lease is not in the right state");
+        // ...
+        currentLease.state = LeaseState.Running;
         safeTransferFrom(owner(), currentLease.lessee, carId);
-        payable(owner()).transfer(currentLease.downPayment + currentLease.monthlyPayment);
+        payable(owner()).transfer(
+            currentLease.downPayment + currentLease.monthlyPayment
+        );
+        setApprovalForAll(owner(), true);
+    }
+
+    /**
+     * @notice Retrieve all lease contracts, regardless of their state.
+     * @return Lease[] An array of Lease structs containing all lease details.
+     */
+    function getAllLeases() public view onlyOwner returns (Lease[] memory) {
+        Lease[] memory allLeases = new Lease[](carIDs.length);
+        for (uint256 i = 0; i < carIDs.length; i++) {
+            allLeases[i] = _leases[carIDs[i]];
+        }
+        return allLeases;
+    }
+
+    /**
+     * @notice Calculate the total monthly payment required, including any late fees if applicable.
+     * @param carId The ID of the leased car
+     * @return uint256 The required payment amount in wei
+     */
+    function calculateMonthlyPaymentAmount(
+        uint256 carId
+    ) public view returns (uint256) {
+        Lease storage currentLease = _leases[carId];
+        require(currentLease.lessee != address(0), "No lease found for this car");
+        require(currentLease.state == LeaseState.Running, "Lease has not been confirmed yet");
+        uint256 requiredPayment = currentLease.monthlyPayment;
+        if (block.timestamp > currentLease.nextPaymentDueDate) {
+            requiredPayment += lateFee;
+        }
+        return requiredPayment;
     }
 
     /**
@@ -295,14 +354,16 @@ contract carForRent is ERC721, Ownable {
         require(currentLease.state == LeaseState.Running, "Lease has not been confirmed yet");
         // Check if missed payment threshold has been exceeded
         if ((block.timestamp > currentLease.nextPaymentDueDate + 60 days) || (currentLease.consecutiveMissedPayments >= maxMissedPaymentsAllowed)) {
-            repossessNFT(carId, currentLease);
-            return PaymentState.Missed;
+            currentLease.lastPaymentStatut = PaymentState.Missed;
+            repossessNFT(carId, currentLease); // if paymentState = Missed : we call the repossessNFT fonction to get the car back to our ownership
         }
         else if (block.timestamp > currentLease.nextPaymentDueDate) {
-            return PaymentState.Late;
+            currentLease.lastPaymentStatut = PaymentState.Late;
         } else {
-            return PaymentState.OnTime;
+            currentLease.lastPaymentStatut = PaymentState.OnTime;
         }
+        // Return current paymentStatut
+        return currentLease.lastPaymentStatut;
     }
 
     // Function to repossess the NFT
