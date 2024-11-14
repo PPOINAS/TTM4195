@@ -35,6 +35,36 @@ contract carForRent is ERC721, Ownable {
         address initialOwner
     ) ERC721("carForRent", "CAR") Ownable(initialOwner) {}
 
+    uint256 public LATE_FEE = 100; // Wei
+    uint256 public MAX_MISSED_PAYMENTS_ALLOWED = 3;
+
+    enum LeaseState {
+        Inactive,
+        Created,
+        Confirmed,
+        Running
+    }
+
+    enum PaymentState {
+        Late,
+        OnTime,
+        Missed
+    }
+
+    struct Lease {
+        address lessee;
+        uint256 monthlyPayment;
+        uint256 downPayment;
+        LeaseState state;
+        uint256 nextPaymentDueDate;
+        uint256 consecutiveMissedPayments;
+        PaymentState lastPaymentStatut;
+        uint256 contractDuration; // months
+        uint256 driverExperience; // years
+        uint256 mileageCap; // km
+        uint256 startingDay;
+    }
+
     struct Car {
         string model;
         string color;
@@ -43,16 +73,19 @@ contract carForRent is ERC721, Ownable {
         uint256 mileage; // km
     }
 
+    // Mapping the leases
+    mapping(uint256 => Lease) public _leases;
     // Mapping each carID to car struct containing all cars
     mapping(uint256 => Car) public _cars;
+
     // Array to store all car IDs
     uint256[] private carIDs;
 
     /**
-     * @notice Checks if a car with the given ID exists in the `_cars` mapping.
-     * @dev Uses the `model` property to determine existence; if `model` is an empty string, the car does not exist.
-     * @param carID The unique identifier of the car to check in the `_cars` mapping.
-     * @return bool Returns `true` if the car exists, `false` if it does not.
+     * @notice Checks if a car with the given ID exists in the `_cars` mapping
+     * @dev Uses the `model` property to determine existence; if `model` is an empty string, the car does not exist
+     * @param carID The unique identifier of the car to check in the `_cars` mapping
+     * @return bool Returns `true` if the car exists, `false` if it does not
      */
     function carExists(uint256 carID) public view returns (bool) {
         return bytes(_cars[carID].model).length > 0;
@@ -60,18 +93,21 @@ contract carForRent is ERC721, Ownable {
 
     /**
      * @notice Create a new car by minting an NFT
-     * @dev Initially, no lessee is assigned. It is going to be the compagny.
+     * @dev Initially, no lessee is assigned. It is going to be the company
      * @param model The model of the car
      * @param color The color of the car
      * @param yearOfMatriculation The year the car was manufactured
      * @param originalValue The original value of the car
+     * @return uint256 The ID of the newly created car
      */
     function createCar(
         string memory model,
         string memory color,
         uint16 yearOfMatriculation,
         uint256 originalValue
-    ) public onlyOwner returns (uint256) {
+    ) 
+        public onlyOwner returns (uint256) 
+    {
         // Get the ID of the new car
         _carIDCounter.increment();
         uint256 carID = _carIDCounter.current();
@@ -93,6 +129,7 @@ contract carForRent is ERC721, Ownable {
 
     /**
      * @notice Remove a car by burning the NFT
+     * @param carID The ID of the car to remove
      */
     function burn(uint256 carID) public onlyOwner {
         require(carExists(carID), "Car does not exist");
@@ -115,7 +152,7 @@ contract carForRent is ERC721, Ownable {
     }
 
     /**
-     * @notice Retrieve details of a car by its carID.
+     * @notice Retrieve details of a car by its carID
      * @param carID The unique ID of the car
      * @return car The car struct containing all details
      */
@@ -125,7 +162,7 @@ contract carForRent is ERC721, Ownable {
     }
 
     /**
-     * @notice Retrieve details of all cars.
+     * @notice Retrieve details of all cars
      * @return Car[] An array of Car structs containing the details of all cars
      */
     function getAllCars() public view returns (Car[] memory) {
@@ -137,7 +174,7 @@ contract carForRent is ERC721, Ownable {
     }
 
     /**
-     * @notice Calculate the monthly quota for renting the car.
+     * @notice Calculate the monthly quota for renting the car
      * @param carID The unique ID of the car
      * @param driverExperience Years of possession of a driving license
      * @param mileageCap The mileage cap (fixed values)
@@ -149,11 +186,12 @@ contract carForRent is ERC721, Ownable {
         uint256 driverExperience,
         uint256 mileageCap,
         uint256 contractDuration
-    ) public view returns (uint256 monthlyQuota) {
+    ) 
+        public view returns (uint256 monthlyQuota) 
+    {
         // Retrieving the car
         Car memory car = getCarDetails(carID);
         // Calculating a base for the monthly quota
-        /* TODO: Prendre en compte l'usure de la voiture avec car.mileage !!! */
         uint256 monthlyBase = (car.originalValue * 4) / 100; // Base cost: 4% of vehicle value per month
         // Apply discount based on driver experience
         // Each year of experience above 5 year provides a 0.5% discount, capped at 3%
@@ -190,36 +228,6 @@ contract carForRent is ERC721, Ownable {
         return monthlyQuota;
     }
 
-    enum LeaseState {
-        Inactive,
-        Created,
-        Confirmed,
-        Running
-    }
-    enum PaymentState {
-        Late,
-        OnTime,
-        Missed
-    }
-    uint256 public lateFee = 100; // Wei
-    uint256 public maxMissedPaymentsAllowed = 3;
-
-    struct Lease {
-        address lessee;
-        uint256 monthlyPayment;
-        uint256 downPayment;
-        LeaseState state;
-        uint256 nextPaymentDueDate;
-        uint256 consecutiveMissedPayments;
-        PaymentState lastPaymentStatut;
-        uint256 contractDuration; // months
-        uint256 driverExperience; // years
-        uint256 mileageCap; // km
-        uint256 startingDay;
-    }
-
-    mapping(uint256 => Lease) public _leases;
-
     /**
      * @notice Initiate a lease for a car
      * @param carID The ID of the car to lease
@@ -232,7 +240,9 @@ contract carForRent is ERC721, Ownable {
         uint256 driverExperience,
         uint256 mileageCap,
         uint256 contractDuration
-    ) public payable {
+    ) 
+        public payable 
+    {
         // Compute and verify payment amount
         uint256 monthlyPayment = calculateMonthlyQuota(
             carID,
@@ -270,11 +280,11 @@ contract carForRent is ERC721, Ownable {
 
     /**
      * @notice Confirm a lease for a car, BilBoyd side
-     * @param carId The ID of the car to lease
+     * @param carID The ID of the car to lease
      */
-    function confirmLease(uint256 carId) external onlyOwner {
+    function confirmLease(uint256 carID) external onlyOwner {
         // Verify the lease exists and needs to be confirmed
-        Lease storage currentLease = _leases[carId];
+        Lease storage currentLease = _leases[carID];
         require(
             currentLease.lessee != address(0),
             "No lease found for this car"
@@ -286,16 +296,16 @@ contract carForRent is ERC721, Ownable {
         // Confirm the lease by passing currentLease.state from 'Created' to 'Running'
         currentLease.state = LeaseState.Confirmed;
         // Transfer NFT to lessee and release payment
-        approve(currentLease.lessee, carId);
+        approve(currentLease.lessee, carID);
     }
 
     /**
      * @notice Valide the lease for a car, client side
-     * @param carId The ID of the car to lease
+     * @param carID The ID of the car to lease
      */
-    function validateLease(uint256 carId) external {
+    function validateLease(uint256 carID) external {
         // Retrieving the lease associated with the car
-        Lease storage currentLease = _leases[carId];
+        Lease storage currentLease = _leases[carID];
         // Requirements
         require(
             currentLease.lessee != address(0),
@@ -307,16 +317,16 @@ contract carForRent is ERC721, Ownable {
         );
         // ...
         currentLease.state = LeaseState.Running;
-        safeTransferFrom(owner(), currentLease.lessee, carId);
+        safeTransferFrom(owner(), currentLease.lessee, carID);
         payable(owner()).transfer(
             currentLease.downPayment + currentLease.monthlyPayment
         );
-        approve(owner(), carId);
+        approve(owner(), carID);
     }
 
     /**
-     * @notice Retrieve all lease contracts, regardless of their state.
-     * @return Lease[] An array of Lease structs containing all lease details.
+     * @notice Retrieve all lease contracts, regardless of their state
+     * @return Lease[] An array of Lease structs containing all lease details
      */
     function getAllLeases() public view onlyOwner returns (Lease[] memory) {
         Lease[] memory allLeases = new Lease[](carIDs.length);
@@ -327,14 +337,16 @@ contract carForRent is ERC721, Ownable {
     }
 
     /**
-     * @notice Calculate the total monthly payment required, including any late fees if applicable.
-     * @param carId The ID of the leased car
+     * @notice Calculate the total monthly payment required, including any late fees if applicable
+     * @param carID The ID of the leased car
      * @return uint256 The required payment amount in wei
      */
     function calculateMonthlyPaymentAmount(
-        uint256 carId
-    ) public view returns (uint256) {
-        Lease storage currentLease = _leases[carId];
+        uint256 carID
+    ) 
+        public view returns (uint256) 
+    {
+        Lease storage currentLease = _leases[carID];
         require(
             currentLease.lessee != address(0),
             "No lease found for this car"
@@ -345,18 +357,18 @@ contract carForRent is ERC721, Ownable {
         );
         uint256 requiredPayment = currentLease.monthlyPayment;
         if (block.timestamp > currentLease.nextPaymentDueDate) {
-            requiredPayment += lateFee;
+            requiredPayment += LATE_FEE;
         }
         return requiredPayment;
     }
 
     /**
      * @notice Lessee interface for monthly payments
-     * @param carId The ID of the leased car
+     * @param carID The ID of the leased car
      */
-    function makeMonthlyPayment(uint256 carId) external payable {
+    function makeMonthlyPayment(uint256 carID) external payable {
         // Retrieving the lease associated with the car
-        Lease storage currentLease = _leases[carId];
+        Lease storage currentLease = _leases[carID];
         // Requirements
         require(
             currentLease.lessee != address(0),
@@ -374,7 +386,7 @@ contract carForRent is ERC721, Ownable {
         uint256 requiredPayment = currentLease.monthlyPayment;
         if (block.timestamp > currentLease.nextPaymentDueDate) {
             // Apply late fee if overdue but within the grace period
-            requiredPayment += lateFee;
+            requiredPayment += LATE_FEE;
             currentLease.consecutiveMissedPayments += 1;
         } else {
             // Reset missed payment count if paid on time
@@ -392,14 +404,17 @@ contract carForRent is ERC721, Ownable {
     }
 
     /**
-     *@notice Company interface to check payments made
-     *@param carId The ID of the leased car
+     * @notice Company interface to check payments made
+     * @param carID The ID of the leased car
+     * @return PaymentState The current payment state
      */
     function checkMonthlyPayment(
-        uint256 carId
-    ) external onlyOwner returns (PaymentState state) {
+        uint256 carID
+    ) 
+        external onlyOwner returns (PaymentState state) 
+    {
         // Retrieve the lease associated with the car
-        Lease storage currentLease = _leases[carId];
+        Lease storage currentLease = _leases[carID];
         // Requirements
         require(
             currentLease.lessee != address(0),
@@ -412,10 +427,10 @@ contract carForRent is ERC721, Ownable {
         // Check if missed payment threshold has been exceeded
         if (
             (block.timestamp > currentLease.nextPaymentDueDate + 60 days) ||
-            (currentLease.consecutiveMissedPayments >= maxMissedPaymentsAllowed)
+            (currentLease.consecutiveMissedPayments >= MAX_MISSED_PAYMENTS_ALLOWED)
         ) {
             currentLease.lastPaymentStatut = PaymentState.Missed;
-            repossessNFT(carId, currentLease); // if paymentState = Missed : we call the repossessNFT fonction to get the car back to our ownership
+            repossessNFT(carID, currentLease); // if paymentState = Missed : we call the repossessNFT fonction to get the car back to our ownership
         } else if (block.timestamp > currentLease.nextPaymentDueDate) {
             currentLease.lastPaymentStatut = PaymentState.Late;
         } else {
@@ -426,32 +441,37 @@ contract carForRent is ERC721, Ownable {
     }
 
     // Function to repossess the NFT
-    function repossessNFT(uint256 carId, Lease storage currentLease) internal {
+    /**
+     * @notice Repossess the NFT from the lessee and return it to the owner
+     * @param carID The ID of the car to repossess
+     * @param currentLease The lease associated with the car
+     */
+    function repossessNFT(uint256 carID, Lease storage currentLease) internal {
         currentLease.state = LeaseState.Inactive;
         // Transfer the NFT back to the owner
-        safeTransferFrom(currentLease.lessee, owner(), carId);
+        safeTransferFrom(currentLease.lessee, owner(), carID);
         // Reset missed payments for record-keeping purposes
         currentLease.consecutiveMissedPayments = 0;
     }
 
     /**
-     * @notice Updates the mileage of the car.
-     * @dev Only the lessee can update the mileage.
-     * @param carId The ID of the car for which the mileage is being updated.
-     * @param distanceTravelled The distance travelled in order to update the mileage to be updated.
+     * @notice Updates the mileage of the car
+     * @dev Only the lessee can update the mileage
+     * @param carID The ID of the car for which the mileage is being updated
+     * @param distanceTravelled The distance travelled in order to update the mileage to be updated
      */
-    function updateMileage(uint256 carId, uint256 distanceTravelled) internal {
-        _cars[carId].mileage += distanceTravelled;
+    function updateMileage(uint256 carID, uint256 distanceTravelled) internal {
+        _cars[carID].mileage += distanceTravelled;
     }
 
     /**
-     * @notice Terminates the lease and returns the car to the owner.
-     * @param carId The ID of the leased car.
-     * @param distanceTravelled The distance travelled by the car before the lease is terminated.
+     * @notice Terminates the lease and returns the car to the owner
+     * @param carID The ID of the leased car
+     * @param distanceTravelled The distance travelled by the car before the lease is terminated
      */
-    function terminateLease(uint256 carId, uint256 distanceTravelled) public {
+    function terminateLease(uint256 carID, uint256 distanceTravelled) public {
         // Retrieving the lease associated with the car
-        Lease storage currentLease = _leases[carId];
+        Lease storage currentLease = _leases[carID];
         // Requirements
         require(
             currentLease.lessee == msg.sender,
@@ -467,24 +487,26 @@ contract carForRent is ERC721, Ownable {
             "Lease duration has not ended yet"
         );
         // Update mileage before terminating lease
-        updateMileage(carId, distanceTravelled);
+        updateMileage(carID, distanceTravelled);
         // Change lease state to Inactive
         currentLease.state = LeaseState.Inactive;
         // Send NFT back to owner
-        safeTransferFrom(msg.sender, owner(), carId);
+        safeTransferFrom(msg.sender, owner(), carID);
     }
 
     /**
-     * @notice Calculates the required payment amount for extending the lease.
-     * @param carId The ID of the car for which the lease is being extended.
-     * @param newDriverExperience The new driver experience years added.
+     * @notice Calculates the required payment amount for extending the lease
+     * @param carID The ID of the car for which the lease is being extended
+     * @param newDriverExperience The new driver experience years added
      * @return uint256 The exact amount in wei needed for the extension
      */
     function calculateExtensionAmount(
-        uint256 carId,
+        uint256 carID,
         uint256 newDriverExperience
-    ) public view returns (uint256) {
-        Lease storage currentLease = _leases[carId];
+    ) 
+        public view returns (uint256) 
+    {
+        Lease storage currentLease = _leases[carID];
         require(
             currentLease.lessee != address(0),
             "No lease found for this car"
@@ -496,7 +518,7 @@ contract carForRent is ERC721, Ownable {
 
         // Use the same logic as in extendLease to calculate the payment
         uint256 monthlyPayment = calculateMonthlyQuota(
-            carId,
+            carID,
             newDriverExperience,
             currentLease.mileageCap,
             12
@@ -505,17 +527,21 @@ contract carForRent is ERC721, Ownable {
     }
 
     /**
-     * @notice Extends the lease by one year and recalculates the monthly amount in the lessee's favor.
-     * @dev The recalculation is done based on updated parameters (e.g., depreciation of car value).
-     * @param carId The ID of the car for which the lease is being extended.
+     * @notice Extends the lease by one year and recalculates the monthly amount in the lessee's favor
+     * @dev The recalculation is done based on updated parameters (e.g., depreciation of car value)
+     * @param carID The ID of the car for which the lease is being extended
+     * @param distanceTravelled The distance travelled by the car before the lease is extended
+     * @param newDriverExperience The new driver experience years added
      */
     function extendLease(
-        uint256 carId,
+        uint256 carID,
         uint256 distanceTravelled,
         uint256 newDriverExperience
-    ) public payable {
+    ) 
+        public payable 
+    {
         // Retrieving the lease associated with the car
-        Lease storage currentLease = _leases[carId];
+        Lease storage currentLease = _leases[carID];
         // Requirements
         require(
             currentLease.lessee == msg.sender,
@@ -526,12 +552,12 @@ contract carForRent is ERC721, Ownable {
             "Lease is not active"
         );
         // Update mileage before extending lease
-        updateMileage(carId, distanceTravelled);
+        updateMileage(carID, distanceTravelled);
         // Updating the lease
         currentLease.driverExperience += newDriverExperience;
         // Recalculate monthly amount
         uint256 monthlyPayment = calculateMonthlyQuota(
-            carId,
+            carID,
             newDriverExperience,
             currentLease.mileageCap,
             12
@@ -546,9 +572,10 @@ contract carForRent is ERC721, Ownable {
 
     /**
      * @notice Terminate the current lease and sign for a new one
-     * @param oldCarId The ID of the current leased car.
-     * @param distanceTravelled The distance travelled by the car before the lease is terminated.
+     * @param oldCarId The ID of the current leased car
+     * @param distanceTravelled The distance travelled by the car before the lease is terminated
      * @param newCarId The ID of the nw car to lease
+     * @param newDriverExperience The new driver experience years added
      * @param newMileageCap The mileage cap [km] (fixed values)
      * @param newContractDuration The duration of the contract [months] (fixed values)
      */
@@ -559,13 +586,10 @@ contract carForRent is ERC721, Ownable {
         uint256 newDriverExperience,
         uint256 newMileageCap,
         uint256 newContractDuration
-    ) public payable {
+    ) 
+        public payable 
+    {
         terminateLease(oldCarId, distanceTravelled);
-        initiateLease(
-            newCarId,
-            newDriverExperience,
-            newMileageCap,
-            newContractDuration
-        );
+        initiateLease(newCarId, newDriverExperience, newMileageCap, newContractDuration);
     }
 }
