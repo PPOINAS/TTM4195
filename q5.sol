@@ -112,7 +112,7 @@ contract carForRent is ERC721, Ownable {
         _carIDCounter.increment();
         uint256 carID = _carIDCounter.current();
         // Mint the NFT representing the car
-        _mint(msg.sender, carID); // With 'onlyOwner': 'msg.sender' can only be the compagny
+        _mint(msg.sender, carID); // With 'onlyOwner': 'msg.sender' can only be the company
         // Store car details in the mapping
         _cars[carID] = Car({
             color: color,
