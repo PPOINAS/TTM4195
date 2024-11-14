@@ -180,7 +180,7 @@ contract carForRent is ERC721, Ownable {
         return monthlyQuota;
     }
 
-    enum LeaseState {Created, Running, Inactive}
+    enum LeaseState {Inactive, Created, Running}
     enum PaymentState {Late, OnTime, Missed}
     uint256 public lateFee = 100; // Wei
     uint256 public maxMissedPaymentsAllowed = 3;
@@ -215,7 +215,9 @@ contract carForRent is ERC721, Ownable {
         // Compute and verify payment amount
         uint256 monthlyPayment = calculateMonthlyQuota(carID, driverExperience, mileageCap, contractDuration);
         uint256 downPayment = 3*monthlyPayment;
+        // Verify payement amount and that the car is available for lease
         require(msg.value == monthlyPayment + downPayment, "Incorrect payment amount");
+        require(_leases[carID].state == LeaseState.Inactive, "Car is not available for lease");
         // Creation of the lease
         _leases[carID] = Lease({
             lessee: msg.sender,
@@ -328,6 +330,7 @@ contract carForRent is ERC721, Ownable {
     /**
      * @notice Terminates the lease and returns the car to the owner.
      * @param carId The ID of the leased car.
+     * @param distanceTravelled The distance travelled by the car before the lease is terminated.
      */
     function terminateLease(uint256 carId, uint256 distanceTravelled) public {
         // Retrieving the lease associated with the car
@@ -372,13 +375,21 @@ contract carForRent is ERC721, Ownable {
         currentLease.contractDuration = 12;
     }
 
-    function signANewLease(
+    /**
+     * @notice Terminate the current lease and sign for a new one
+     * @param oldCarId The ID of the current leased car.
+     * @param distanceTravelled The distance travelled by the car before the lease is terminated.
+     * @param newCarId The ID of the nw car to lease
+     * @param newMileageCap The mileage cap [km] (fixed values)
+     * @param newContractDuration The duration of the contract [months] (fixed values)
+     */
+    function signNewLease (
         uint256 oldCarId, 
         uint256 distanceTravelled,
         uint256 newCarId,
         uint256 newMileageCap,
         uint256 newContractDuration
-    ) external {
+    ) public payable {
         terminateLease(oldCarId, distanceTravelled);
         // Retrieving the lease associated with the car
         Lease storage oldLease = _leases[oldCarId];
