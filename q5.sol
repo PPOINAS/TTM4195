@@ -180,7 +180,7 @@ contract carForRent is ERC721, Ownable {
         return monthlyQuota;
     }
 
-    enum LeaseState {Created, Running, Inactive}
+    enum LeaseState {Inactive, Running, Created}
     enum PaymentState {Late, OnTime, Missed}
     uint256 public lateFee = 100; // GWei
     uint256 public maxMissedPaymentsAllowed = 3;
@@ -215,7 +215,12 @@ contract carForRent is ERC721, Ownable {
         // Compute and verify payment amount
         uint256 monthlyPayment = calculateMonthlyQuota(carID, driverExperience, mileageCap, contractDuration);
         uint256 downPayment = 3*monthlyPayment;
+        // Verify payment amount
         require(msg.value == monthlyPayment + downPayment, "Incorrect payment amount");
+        // Verify the car is available for lease
+        require(_leases[carID].state == LeaseState.Inactive, "Car is not available for lease");
+        
+        
         // Creation of the lease
         _leases[carID] = Lease({
             lessee: msg.sender,
@@ -328,6 +333,7 @@ contract carForRent is ERC721, Ownable {
     /**
      * @notice Terminates the lease and returns the car to the owner.
      * @param carId The ID of the leased car.
+     * @param distanceTravelled The distance travelled by the car before the lease is terminated.
      */
     function terminateLease(uint256 carId, uint256 distanceTravelled) external {
         // Retrieving the lease associated with the car
