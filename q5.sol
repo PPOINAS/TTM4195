@@ -37,9 +37,9 @@ contract carForRent is ERC721, Ownable {
     struct Car {
         string model;
         string color;
-        uint16 yearOfMatriculation;
-        uint256 originalValue;
-        uint256 mileage;
+        uint16 yearOfMatriculation; // year
+        uint256 originalValue; // Wei
+        uint256 mileage; // km
     }
 
     // Mapping each carID to car struct containing all cars
@@ -180,9 +180,9 @@ contract carForRent is ERC721, Ownable {
         return monthlyQuota;
     }
 
-    enum LeaseState {Inactive, Running, Created}
+    enum LeaseState {Created, Running, Inactive}
     enum PaymentState {Late, OnTime, Missed}
-    uint256 public lateFee = 100; // GWei
+    uint256 public lateFee = 100; // Wei
     uint256 public maxMissedPaymentsAllowed = 3;
 
     struct Lease {
@@ -192,9 +192,9 @@ contract carForRent is ERC721, Ownable {
         LeaseState state;
         uint256 nextPaymentDueDate;
         uint256 consecutiveMissedPayments;
-        uint256 contractDuration;
-        uint256 driverExperience;
-        uint256 mileageCap;
+        uint256 contractDuration; // months
+        uint256 driverExperience; // years
+        uint256 mileageCap; // km
     }
 
     mapping(uint256 => Lease) public _leases;
@@ -211,16 +211,11 @@ contract carForRent is ERC721, Ownable {
         uint256 driverExperience,
         uint256 mileageCap,
         uint256 contractDuration
-    ) external payable {
+    ) public payable {
         // Compute and verify payment amount
         uint256 monthlyPayment = calculateMonthlyQuota(carID, driverExperience, mileageCap, contractDuration);
         uint256 downPayment = 3*monthlyPayment;
-        // Verify payment amount
         require(msg.value == monthlyPayment + downPayment, "Incorrect payment amount");
-        // Verify the car is available for lease
-        require(_leases[carID].state == LeaseState.Inactive, "Car is not available for lease");
-        
-        
         // Creation of the lease
         _leases[carID] = Lease({
             lessee: msg.sender,
@@ -333,9 +328,8 @@ contract carForRent is ERC721, Ownable {
     /**
      * @notice Terminates the lease and returns the car to the owner.
      * @param carId The ID of the leased car.
-     * @param distanceTravelled The distance travelled by the car before the lease is terminated.
      */
-    function terminateLease(uint256 carId, uint256 distanceTravelled) external {
+    function terminateLease(uint256 carId, uint256 distanceTravelled) public {
         // Retrieving the lease associated with the car
         Lease storage currentLease = _leases[carId];
         // Requirements
@@ -355,7 +349,7 @@ contract carForRent is ERC721, Ownable {
      * @dev The recalculation is done based on updated parameters (e.g., depreciation of car value).
      * @param carId The ID of the car for which the lease is being extended.
      */
-    function extendLease(uint256 carId, uint256 distanceTravelled) external payable {
+    function extendLease(uint256 carId, uint256 distanceTravelled) public payable {
         // Retrieving the lease associated with the car
         Lease storage currentLease = _leases[carId];
         // Requirements
@@ -373,9 +367,22 @@ contract carForRent is ERC721, Ownable {
         require(msg.value == monthlyPayment, "Incorrect payment amount");
         // Updating the other terms of the lease
         currentLease.monthlyPayment = monthlyPayment;
-        currentLease.state = LeaseState.Running;
         currentLease.nextPaymentDueDate = block.timestamp + 30 days;
         currentLease.consecutiveMissedPayments = 0;
         currentLease.contractDuration = 12;
+    }
+
+    function signANewLease(
+        uint256 oldCarId, 
+        uint256 distanceTravelled,
+        uint256 newCarId,
+        uint256 newMileageCap,
+        uint256 newContractDuration
+    ) external {
+        terminateLease(oldCarId, distanceTravelled);
+        // Retrieving the lease associated with the car
+        Lease storage oldLease = _leases[oldCarId];
+        uint256 driverExperience = oldLease.driverExperience + (oldLease.contractDuration / 12);
+        initiateLease(newCarId, driverExperience, newMileageCap, newContractDuration);
     }
 }
