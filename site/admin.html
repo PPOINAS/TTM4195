@@ -38,9 +38,20 @@
             <button type="submit">Confirm Lease</button>
         </form>
 
+        <h2>All Lease Contracts</h2>
+        <button onclick="loadAllLeases()">Load All Leases</button>
+        <div id="allLeases"></div>
+
         <h2>Car owners</h2>
         <button onclick="loadCarsWithOwners()">Load Car owners</button>
         <div id="carOwners"></div>
+
+        <h2>Check Payment Status</h2>
+        <form id="paymentStatusForm" onsubmit="checkPaymentStatusForm(event)">
+            <input type="number" id="statusCarId" placeholder="Car ID" required>
+            <button type="submit">Check Status</button>
+        </form>
+
     </main>
 
     <script src="script.js" type="module"></script>

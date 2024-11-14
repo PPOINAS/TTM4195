@@ -2,17 +2,16 @@ import {createWalletClient, custom, parseEther, createPublicClient, http} from "
 import {sepolia} from "https://esm.sh/viem/chains";
 
 //contract infos
-const contractAddress = '0x895C676B80b03AA4D3f9d01fa11F16a024630b5b';
-let contractABI = null; // ABI to be loaded asynchronously
+const contractAddress = '0xb1aF57Bd8b75Ca45387d00F85a7a3909BbA5Ad07';
+let contractABI = null; // ABI to be loaded from an extern file
 
-//temporary
-//writting manualy the numbers of cars currently created : 
-let nbCars = 3;
+//TODO use the getAllCars fct from SC to get the number of cars automatically 
+let nbCars = 1; //writting manualy the numbers of cars currently created
 
 //load ABI from JSON file
 async function loadABI() {
     try {
-        const response = await fetch('contractABI.json');
+        const response = await fetch('contractABI.json'); //getting the ABI from 'contractABI.json'
         contractABI = await response.json();
         console.log("ABI loaded successfully");
     } catch (error) {
@@ -32,6 +31,20 @@ const publicClient = createPublicClient({
 	chain: sepolia,
 	transport: http()
 })
+
+//creating the struct to have similars one as in the SC 
+const LeaseState = {
+    0: "Inactive",
+    1: "Created",
+    2: "Confirmed",
+    3: "Running"
+};
+
+const PaymentState = {
+    0: "On Time",
+    1: "Late",
+    2: "Missed"
+};
 
 // function to connect user wallet (using viem library)
 async function connectWallet() {
@@ -65,7 +78,7 @@ async function connectWallet() {
     }
 }
 
-// function to add a new car
+// function link adding car form to createCar from SC
 async function submitCarForm(event) {
     event.preventDefault(); //prevent page refreshing
 
@@ -103,11 +116,11 @@ async function submitCarForm(event) {
     }
 }
 
-/* function to load the car list
-ATTENTION : elle ne fonctionne qu'avec des id consécutif
+/* function to load the car list from SC and display it
 TODO : 
-- prendre en compte la suppression des véhicules (utiliser une fonciton du SC qui retourne la liste des véhicules)
-- nombre de véhicule défini statiquement pour le moment (ajouter une fonciton dans le smart contract ? (juste en retournant le comtpeur local au smart contract))
+- take into account the deletion of vehicles (use a SC function that returns the list of vehicles)
+- number of vehicles statically defined for the moment (add a function in the smart contract? (just return the local controller to the smart contract))
+- make the function robust to non-consecutive IDs
 */
 async function loadCars() {
     if (!walletClient) {
@@ -158,10 +171,13 @@ async function loadCars() {
 }
 
 //function to initiate a new lease demand
-//TODO : ajouter une vérificaition pour savoir si la voiture est déjà louée ?? ou alors ne plus la faire apparaitre dans la liste ? 
-//TODO : modifier la fonciton du SC initiateLease pour enlever l'argument nécessitant la owner address ? 
 async function submitLeaseForm(event) {
     event.preventDefault(); //prevent the browser from refreshing the page
+
+    if (!walletClient) {
+        alert("Please connect your wallet first!");
+        return;
+    }
 
 	//gathering form filling variables
     const carId = document.getElementById('carId').value;
@@ -186,7 +202,8 @@ async function submitLeaseForm(event) {
             abi: contractABI,
             functionName: "calculateMonthlyQuota",
             args: [
-                carDetails.originalValue,
+                //carDetails.originalValue,
+                carId,
                 driverExperience,
                 mileageCap,
                 contractDuration,
@@ -196,8 +213,8 @@ async function submitLeaseForm(event) {
 		//calculate the payments to made
         const downPayment = BigInt(3) * monthlyPayment;
         const totalPayment = monthlyPayment + downPayment;
-		console.log('downPayment', downPayment);
-		console.log('totalPayment', totalPayment);
+		console.log('downPayment', downPayment); //console log
+		console.log('totalPayment', totalPayment); //console log
 
 		//calling the initiateLease from SC identified as the walletClient 
         await walletClient.writeContract({
@@ -210,7 +227,6 @@ async function submitLeaseForm(event) {
                 driverExperience,
                 mileageCap,
                 contractDuration,
-                "0xb6cC46F765079B2e0Ae2CB66f6cdE62B3d0A309c" //contract owner address
             ],
             account: userAccount,
             value: totalPayment, // transaction montant
@@ -227,13 +243,18 @@ async function submitLeaseForm(event) {
 async function submitConfirmLeaseForm(event) {
     event.preventDefault(); //prevent the browser from refreshing the page
 
+    if (!walletClient) {
+        alert("Please connect your wallet first!");
+        return;
+    }
+
 	//gathering variable for filled form
     const carId = document.getElementById('confirmCarId').value;
 
     try {
         // confirmLease from SC function call (identified as walletClient because you need to be identified as the owner)
         await walletClient.writeContract({
-            client: walletClient,
+            //client: walletClient,
             address: contractAddress,
             abi: contractABI,
             functionName: "confirmLease",
@@ -248,6 +269,35 @@ async function submitConfirmLeaseForm(event) {
     }
 }
 
+// function for lessee to validate the lease and obtain the car (NFT)
+async function submitValidateLeaseForm(event) {
+    event.preventDefault(); // Prevent page refresh
+
+    //gathering variable for filled form
+    const carId = document.getElementById('validateCarId').value;
+
+    if (!walletClient) {
+        alert("Please connect your wallet first!");
+        return;
+    }
+
+    try {
+        // calling validateLease from SC
+        await walletClient.writeContract({
+            address: contractAddress,
+            abi: contractABI,
+            functionName: "validateLease",
+            args: [carId],
+            account: userAccount, // must be the lessee
+        });
+
+        alert(`Lease validated for Car ID: ${carId}. You now have the key!`);
+    } catch (error) {
+        console.error("Error validating lease:", error);
+        alert("Failed to validate lease. Please try again.");
+    }
+}
+
 //printing car owners and status
 async function loadCarsWithOwners() {
     if (!walletClient) {
@@ -258,7 +308,7 @@ async function loadCarsWithOwners() {
     try {
         let carID = 1;
         const carListElement = document.getElementById('carOwners');
-        carListElement.innerHTML = ""; // réinitialise la liste des voitures
+        carListElement.innerHTML = ""; // reinitialize car list
 
         // loop for checking all the cars from the Bilboyd company
         while (carID <= nbCars) {
@@ -292,6 +342,296 @@ async function loadCarsWithOwners() {
     }
 }
 
+//load and print all leases (not regarding their currents states)
+/* TODO : 
+- Make sure we can display dates (next due date, start date, ...)
+- Display other info from struct Lease is much more extensive than what we're currently displaying
+*/
+async function loadAllLeases() {
+
+    let leaseIndex = 0;
+
+    if (!walletClient) {
+        alert("Please connect your wallet first!");
+        return;
+    }
+
+    try {
+        // Retrieve all leases regardless of their state
+        const allLeases = await publicClient.readContract({
+            address: contractAddress,
+            abi: contractABI,
+            functionName: "getAllLeases",
+            account: userAccount, // Must be an owner account
+        });
+
+        const leasesElement = document.getElementById('allLeases');
+        leasesElement.innerHTML = ""; // Reset display
+
+        for (let lease of allLeases) {
+            //const carId = lease.carId;
+            leaseIndex +=1; // the lease index correspond to the carId
+
+            // HTML element creation to display lease details
+            //<p><strong>Next Payment Due:</strong> ${new Date(lease.nextPaymentDueDate * BigInt(1000)).toLocaleString()}</p>
+            const leaseItem = document.createElement("div");
+            leaseItem.innerHTML = `
+                <p><strong>Car ID:</strong> ${leaseIndex}</p>
+                <p><strong>Lessee Address:</strong> ${lease.lessee}</p>
+                <p><strong>Monthly Payment:</strong> ${lease.monthlyPayment} wei</p>
+                <p><strong>Down Payment:</strong> ${lease.downPayment} wei</p>
+                <p><strong>Lease State:</strong> ${LeaseState[lease.state]}</p>
+                <p><strong>Last Payment Status:</strong> ${PaymentState[lease.lastPaymentStatut]}</p>
+                <p><strong>Consecutive Missed Payments:</strong> ${lease.consecutiveMissedPayments}</p>
+                <hr>
+            `;
+            leasesElement.appendChild(leaseItem);
+        }
+    } catch (error) {
+        console.error("Error loading leases:", error);
+        alert("Failed to load leases. Please try again.");
+    }
+}
+
+// function for lessee to make a monthly payment
+async function submitMonthlyPaymentForm(event) {
+    event.preventDefault(); // prevent page refresh
+
+    const carId = parseInt(document.getElementById('paymentCarId').value); // carID the lessee is currently renting
+
+    if (!walletClient) {
+        alert("Please connect your wallet first!");
+        return;
+    }
+
+    try {
+        // Fetch the amount to be paid from the contract
+        const requiredPayment = await publicClient.readContract({
+            address: contractAddress,
+            abi: contractABI,
+            functionName: "calculateMonthlyPaymentAmount",
+            args: [carId],
+        });
+
+        // calling makeMonthlyPayment on the SC with the retreived requiredPayment from "calculateMonthlyPaymentAmount" from SC
+        const txHash = await walletClient.writeContract({
+            address: contractAddress,
+            abi: contractABI,
+            functionName: "makeMonthlyPayment",
+            args: [carId],
+            account: userAccount,
+            value: requiredPayment, // send the exact amount needed
+        });
+
+        alert(`Monthly payment sent for Car ID ${carId}. Transaction hash: ${txHash}`);
+    } catch (error) {
+        console.error("Error making monthly payment:", error);
+        alert("Failed to make monthly payment. Please try again.");
+    }
+}
+
+// Function for owner to check payment status
+// by calling checkMonthlyPayment from the SC, this JS function also initialize a NFT repossesion if necessary (costs gaz)
+/* TODO: 
+- retrieve the payment status to display it (use getAllLease at worst)
+- reset an alert after retrieving the correct PaymentStatus
+*/
+async function checkPaymentStatusForm(event) {
+    event.preventDefault();
+
+    const carId = parseInt(document.getElementById('statusCarId').value);
+
+    if (!walletClient) {
+        alert("Please connect your wallet first!");
+        return;
+    }
+
+    try {
+        //calling checkMonthlyPayment on the SC
+        const paymentStatut = await walletClient.writeContract({ //fct onlyOwner
+            address: contractAddress,
+            abi: contractABI,
+            functionName: "checkMonthlyPayment",
+            args: [carId],
+            account: userAccount, //owner's account needed
+        });
+        
+        /*
+        // calling checkMonthlyPayment on the SC
+        const {request} = await publicClient.simulateContract({ //fct onlyOwner
+            address: contractAddress,
+            abi: contractABI,
+            functionName: "checkMonthlyPayment",
+            args: [carId],
+            account: userAccount, //owner's account needed
+        });
+
+        const hash = await walletClient.writeContract(request);
+        console.log("le hash", hash);
+
+        
+        
+        const { request } = await publicClient.simulateContract({
+            address: '0xFBA3912Ca04dd458c843e2EE08967fC04f3579c2',
+            abi: wagmiAbi,
+            functionName: 'mint',
+            account,
+          })
+          const hash = await walletClient.writeContract(request)
+        
+
+        console.log("affichage du raw paymentStatut : ", paymentStatut);
+
+        let statusMessage;
+        if (paymentStatut === 0) {
+            statusMessage = "Payment status: On Time";
+        } else if (paymentStatut === 1) {
+            statusMessage = "Payment status: Late";
+        } else if (paymentStatut === 2) {
+            statusMessage = "Payment status: Missed";
+        } else {
+            statusMessage = "Unknown payment status";
+        }
+        */
+
+        alert("Update the all lease list to see payment status");
+
+    } catch (error) {
+        console.error("Error checking payment status:", error);
+        alert("Failed to check payment status. Please try again.");
+    }
+}
+
+// function to terminate lease by calling terminateLease from SC
+async function submitTerminateLeaseForm(event) {
+    event.preventDefault(); // Prevent page reload on form submission
+
+    // gathering value from the form
+    const carId = parseInt(document.getElementById('terminateCarId').value);
+    const distanceTravelledEndingLease = parseInt(document.getElementById('distanceTravelledEndingLease').value);
+
+    if (!walletClient) {
+        alert("Please connect your wallet first!");
+        return;
+    }
+
+    try {
+        // calling terminateLease of SC
+        const txHash = await walletClient.writeContract({
+            address: contractAddress,
+            abi: contractABI,
+            functionName: "terminateLease",
+            args: [carId, distanceTravelledEndingLease],
+            account: userAccount,
+        });
+
+        alert(`Lease for Car ID: ${carId} has been successfully terminated! Transaction hash: ${txHash}`);
+    } catch (error) {
+        console.error("Error terminating lease:", error);
+        alert("Failed to terminate lease. Please try again.");
+    }
+}
+
+// Function to extend lease by calling extendLease from SC
+async function submitExtendLeaseForm(event) {
+    event.preventDefault(); // Prevent page reload on form submission
+
+    // gathering from values
+    const carId = parseInt(document.getElementById('extendCarId').value);
+    const distanceTravelled = parseInt(document.getElementById('extendDistanceTravelled').value);
+    const newDriverExperience2 = parseInt(document.getElementById('newDriverExperience2').value);
+
+    if (!walletClient) {
+        alert("Please connect your wallet first!");
+        return;
+    }
+
+    try {
+        // calling calculateExtensionAmount from SC to get the exact payment amount for lease extension
+        const requiredExtensionAmount = await publicClient.readContract({
+        address: contractAddress,
+        abi: contractABI,
+        functionName: "calculateExtensionAmount",
+        args: [carId, newDriverExperience2]
+        });
+
+        console.log("Required extension amount:", requiredExtensionAmount);
+
+        // calling extendLease fct from SC with exact amount
+        const txHash = await walletClient.writeContract({
+            address: contractAddress,
+            abi: contractABI,
+            functionName: "extendLease",
+            args: [carId, distanceTravelled, newDriverExperience2],
+            account: userAccount,
+            value: requiredExtensionAmount, // exact amount retreived by requiredExtensionAmount from SC
+        });
+
+        alert(`Lease for Car ID: ${carId} has been successfully extended! Transaction hash: ${txHash}`);
+    } catch (error) {
+        console.error("Error extending lease:", error);
+        alert("Failed to extend lease. Please try again.");
+    }
+}
+
+// Function to sign a new lease by calling signNewLease from SC
+async function submitSignNewLeaseForm(event) {
+    event.preventDefault(); // Prevent page reload on form submission
+
+    if (!walletClient) {
+        alert("Please connect your wallet first!");
+        return;
+    }
+
+    // gathering value from the form
+    const oldCarId = parseInt(document.getElementById('oldCarId').value);
+    const distanceTravelledNewLease = parseInt(document.getElementById('distanceTravelledNewLease').value);
+    const newCarId = parseInt(document.getElementById('newCarId').value);
+    const newMileageCap = parseInt(document.getElementById('newMileageCap').value);
+    const newContractDuration = parseInt(document.getElementById('newContractDuration').value);
+    const newDriverExperience = parseInt(document.getElementById('newDriverExperience').value);
+
+    console.log("Old Car ID:", oldCarId);
+    console.log("Distance Travelled:", distanceTravelledNewLease);
+    console.log("New Car ID:", newCarId);
+    console.log("New Mileage Cap:", newMileageCap);
+    console.log("New Contract Duration:", newContractDuration);
+    console.log("New Driver Experience:", newDriverExperience);
+
+
+    try {
+        // getting the now monthlyPayment amount buy calling calculateMonthlyQuota from SC
+        const monthlyPayment = await publicClient.readContract({
+            address: contractAddress,
+            abi: contractABI,
+            functionName: "calculateMonthlyQuota",
+            args: [newCarId, newDriverExperience, newMileageCap, newContractDuration]
+        });
+
+        console.log("retour calculatreMonthlyQuota", monthlyPayment);
+
+        //calculate the payments to made (as it's a new lease you have to pay again the caution)
+        const downPayment = BigInt(3) * BigInt(monthlyPayment);
+        const totalPayment = BigInt(monthlyPayment) + downPayment;
+        console.log('downPayment', downPayment);
+        console.log('totalPayment', totalPayment);
+
+        // calling signNewLease fct from SC
+        const txHash = await walletClient.writeContract({
+            address: contractAddress,
+            abi: contractABI,
+            functionName: "signNewLease",
+            args: [oldCarId, distanceTravelledNewLease, newCarId, newDriverExperience, newMileageCap, newContractDuration],
+            account: userAccount,
+            value: totalPayment, // amount in wei of new lease monthly price
+        });
+
+        alert(`New lease signed for Car ID: ${newCarId}! Transaction hash: ${txHash}`);
+    } catch (error) {
+        console.error("Error signing new lease:", error);
+        alert("Failed to sign new lease. Please try again.");
+    }
+}
 
 // exporting functions names to be globally visibles (permit calls from the HTML files)
 window.connectWallet = connectWallet;
@@ -299,4 +639,11 @@ window.submitCarForm = submitCarForm;
 window.loadCars = loadCars;
 window.submitLeaseForm = submitLeaseForm;
 window.submitConfirmLeaseForm = submitConfirmLeaseForm;
+window.submitValidateLeaseForm = submitValidateLeaseForm;
 window.loadCarsWithOwners = loadCarsWithOwners;
+window.submitMonthlyPaymentForm = submitMonthlyPaymentForm;
+window.checkPaymentStatusForm = checkPaymentStatusForm;
+window.loadAllLeases = loadAllLeases;
+window.submitTerminateLeaseForm = submitTerminateLeaseForm;
+window.submitExtendLeaseForm = submitExtendLeaseForm;
+window.submitSignNewLeaseForm = submitSignNewLeaseForm;

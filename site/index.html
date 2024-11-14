@@ -30,6 +30,56 @@
           <input type="number" id="contractDuration" placeholder="Contract Duration (months)" required>
           <button type="submit">Lease Car</button>
       </form>
+
+      <h2>Get the key</h2>
+      <form id="validateLeaseForm">
+        <label for="validateCarId">Enter Car ID to Validate Lease:</label>
+        <input type="text" id="validateCarId" required>
+        <button onclick="submitValidateLeaseForm(event)">Get the Key</button>
+      </form>
+
+      <h2>Make Monthly Payment</h2>
+      <form id="monthlyPaymentForm" onsubmit="submitMonthlyPaymentForm(event)">
+        <input type="number" id="paymentCarId" placeholder="Car ID" required>
+        <button type="submit">Submit Payment</button>
+      </form>
+
+      <h2>Terminate Lease</h2>
+      <form id="terminateLeaseForm" onsubmit="submitTerminateLeaseForm(event)">
+        <label for="terminateCarId">Car ID:</label>
+        <input type="number" id="terminateCarId" required>
+        <label for="distanceTravelledEndingLease">Distance Travelled (km):</label>
+        <input type="number" id="distanceTravelledEndingLease" required>
+        <button type="submit">Terminate Lease</button>
+      </form>
+      
+      <h2>Extend Lease of 1year</h2>
+      <form id="extendLeaseForm" onsubmit="submitExtendLeaseForm(event)">
+        <label for="extendCarId">Car ID:</label>
+        <input type="number" id="extendCarId" required>
+        <label for="extendDistanceTravelled">Distance Travelled (km):</label>
+        <input type="number" id="extendDistanceTravelled" required>
+        <label for="newDriverExperience2">newDriverExperience2</label>
+        <input type="number" id="newDriverExperience2" required>
+        <button type="submit">Extend Lease</button>
+      </form>
+      
+      <h2>Sign New Lease</h2>
+      <form id="signNewLeaseForm" onsubmit="submitSignNewLeaseForm(event)">
+        <label for="oldCarId">Old Car ID:</label>
+        <input type="number" id="oldCarId" required>
+        <label for="distanceTravelledNewLease">Distance Travelled (km):</label>
+        <input type="number" id="distanceTravelledNewLease" required>
+        <label for="newCarId">New Car ID:</label>
+        <input type="number" id="newCarId" required>
+        <label for="newMileageCap">New Mileage Cap (km):</label>
+        <input type="number" id="newMileageCap" required>
+        <label for="newContractDuration">New Contract Duration (months):</label>
+        <input type="number" id="newContractDuration" required>
+        <label for="newDriverExperience">New driverExperience:</label>
+        <input type="number" id="newDriverExperience" required>
+        <button type="submit">Sign New Lease</button>
+      </form>
     </main>
     
     <script src="script.js" type="module"></script>
