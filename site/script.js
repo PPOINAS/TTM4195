@@ -5,9 +5,6 @@ import {sepolia} from "https://esm.sh/viem/chains";
 const contractAddress = '0xb1aF57Bd8b75Ca45387d00F85a7a3909BbA5Ad07';
 let contractABI = null; // ABI to be loaded from an extern file
 
-//TODO use the getAllCars fct from SC to get the number of cars automatically 
-let nbCars = 1; //writting manualy the numbers of cars currently created
-
 //load ABI from JSON file
 async function loadABI() {
     try {
@@ -31,6 +28,32 @@ const publicClient = createPublicClient({
 	chain: sepolia,
 	transport: http()
 })
+
+//global variable for the number of cars currently hold by the renting company
+let nbCars;
+
+async function getNumberOfCars() {
+    try {
+        // calling getAllCars from SC
+        const cars = await publicClient.readContract({
+            address: contractAddress,
+            abi: contractABI,        
+            functionName: "getAllCars",
+        });
+
+        // save the car numbers
+        nbCars = cars.length;
+
+        //console.log("Number of cars:", numberOfCars);
+        return nbCars;
+    } catch (error) {
+        console.error("Error fetching the number of cars:", error);
+    }
+}
+
+//calling number of car func at file opening :
+await getNumberOfCars();
+console.log("current number of cars : ", nbCars);
 
 //creating the struct to have similars one as in the SC 
 const LeaseState = {
@@ -123,10 +146,9 @@ TODO :
 - make the function robust to non-consecutive IDs
 */
 async function loadCars() {
-    if (!walletClient) {
-        alert("Please connect your wallet first!");
-        return;
-    }
+    //retreiving current car number
+    await getNumberOfCars();
+    console.log("current number of cars : ", nbCars);
 
     try {
         let carID = 1; //first car has id : 1 and after we increment
@@ -152,9 +174,8 @@ async function loadCars() {
                     <p><strong>Model:</strong> ${carDetails.model}</p>
                     <p><strong>Color:</strong> ${carDetails.color}</p>
                     <p><strong>Year of Matriculation:</strong> ${carDetails.yearOfMatriculation}</p>
-                    <p><strong>Original Value:</strong> ${parseInt(carDetails.originalValue) / 1e18} ETH (ou ${parseInt(carDetails.originalValue)} en wei (value * 10e-18ETH)</p>
+                    <p><strong>Original Value:</strong> ${parseInt(carDetails.originalValue) / 1e18} ETH (${parseInt(carDetails.originalValue)} wei)</p>
                     <p><strong>Mileage:</strong> ${carDetails.mileage}</p>
-                    <hr>
                 `;
                 carListElement.appendChild(carItem);
                 carID++;
@@ -305,6 +326,10 @@ async function loadCarsWithOwners() {
         return;
     }
 
+    //retreiving current car number
+    await getNumberOfCars();
+    console.log("current number of cars : ", nbCars);
+
     try {
         let carID = 1;
         const carListElement = document.getElementById('carOwners');
@@ -326,7 +351,6 @@ async function loadCarsWithOwners() {
                 carItem.innerHTML = `
                     <p><strong>Car ID:</strong> ${carID}</p>
                     <p><strong>Owner Address:</strong> ${owner}</p>
-                    <hr>
                 `;
                 carListElement.appendChild(carItem);
                 carID++;
@@ -383,7 +407,6 @@ async function loadAllLeases() {
                 <p><strong>Lease State:</strong> ${LeaseState[lease.state]}</p>
                 <p><strong>Last Payment Status:</strong> ${PaymentState[lease.lastPaymentStatut]}</p>
                 <p><strong>Consecutive Missed Payments:</strong> ${lease.consecutiveMissedPayments}</p>
-                <hr>
             `;
             leasesElement.appendChild(leaseItem);
         }
