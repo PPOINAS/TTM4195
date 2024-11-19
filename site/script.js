@@ -406,7 +406,7 @@ async function loadAllLeases() {
                 <p><strong>Down Payment:</strong> ${lease.downPayment} wei</p>
                 <p><strong>Lease State:</strong> ${LeaseState[lease.state]}</p>
                 <p><strong>Last Payment Status:</strong> ${PaymentState[lease.lastPaymentStatut]}</p>
-                <p><strong>Consecutive Missed Payments:</strong> ${lease.consecutiveMissedPayments}</p>
+                <p><strong>Consecutive Late Payments:</strong> ${lease.consecutiveMissedPayments}</p>
             `;
             leasesElement.appendChild(leaseItem);
         }
