@@ -2,7 +2,7 @@ import {createWalletClient, custom, parseEther, createPublicClient, http} from "
 import {sepolia} from "https://esm.sh/viem/chains";
 
 //contract infos
-const contractAddress = '0xb1aF57Bd8b75Ca45387d00F85a7a3909BbA5Ad07';
+const contractAddress = '0x5bd3a4E94a5F2244F9754C40D8C6548E3cF2dCCC';
 let contractABI = null; // ABI to be loaded from an extern file
 
 //load ABI from JSON file
@@ -141,9 +141,8 @@ async function submitCarForm(event) {
 
 /* function to load the car list from SC and display it
 TODO : 
-- take into account the deletion of vehicles (use a SC function that returns the list of vehicles)
-- number of vehicles statically defined for the moment (add a function in the smart contract? (just return the local controller to the smart contract))
-- make the function robust to non-consecutive IDs
+- make the function robust to non-consecutive IDs (in case of car deleting)
+- display only available cars ?
 */
 async function loadCars() {
     //retreiving current car number
@@ -370,6 +369,7 @@ async function loadCarsWithOwners() {
 /* TODO : 
 - Make sure we can display dates (next due date, start date, ...)
 - Display other info from struct Lease is much more extensive than what we're currently displaying
+- Make sure the PaymentStatus is update well (check if updated regularly enought in SC)
 */
 async function loadAllLeases() {
 
@@ -454,10 +454,10 @@ async function submitMonthlyPaymentForm(event) {
 }
 
 // Function for owner to check payment status
-// by calling checkMonthlyPayment from the SC, this JS function also initialize a NFT repossesion if necessary (costs gaz)
+// by calling checkMonthlyPayment from the SC, a NFT repossesion is initiated by SC if necessary (reason why it costs gaz)
 /* TODO: 
 - retrieve the payment status to display it (use getAllLease at worst)
-- reset an alert after retrieving the correct PaymentStatus
+- pop up an alert after retrieving the correct PaymentStatus to print it on screen
 */
 async function checkPaymentStatusForm(event) {
     event.preventDefault();
@@ -500,7 +500,7 @@ async function checkPaymentStatusForm(event) {
             functionName: 'mint',
             account,
           })
-          const hash = await walletClient.writeContract(request)
+        const hash = await walletClient.writeContract(request)
         
 
         console.log("affichage du raw paymentStatut : ", paymentStatut);
@@ -597,7 +597,7 @@ async function submitExtendLeaseForm(event) {
     }
 }
 
-// Function to sign a new lease by calling signNewLease from SC
+// function to sign a new lease by calling signNewLease from SC
 async function submitSignNewLeaseForm(event) {
     event.preventDefault(); // Prevent page reload on form submission
 
