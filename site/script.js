@@ -2,11 +2,8 @@ import {createWalletClient, custom, parseEther, createPublicClient, http} from "
 import {sepolia} from "https://esm.sh/viem/chains";
 
 //contract infos
-const contractAddress = '0xb1aF57Bd8b75Ca45387d00F85a7a3909BbA5Ad07';
+const contractAddress = '0x5bd3a4E94a5F2244F9754C40D8C6548E3cF2dCCC';
 let contractABI = null; // ABI to be loaded from an extern file
-
-//TODO use the getAllCars fct from SC to get the number of cars automatically 
-let nbCars = 1; //writting manualy the numbers of cars currently created
 
 //load ABI from JSON file
 async function loadABI() {
@@ -31,6 +28,32 @@ const publicClient = createPublicClient({
 	chain: sepolia,
 	transport: http()
 })
+
+//global variable for the number of cars currently hold by the renting company
+let nbCars;
+
+async function getNumberOfCars() {
+    try {
+        // calling getAllCars from SC
+        const cars = await publicClient.readContract({
+            address: contractAddress,
+            abi: contractABI,        
+            functionName: "getAllCars",
+        });
+
+        // save the car numbers
+        nbCars = cars.length;
+
+        //console.log("Number of cars:", numberOfCars);
+        return nbCars;
+    } catch (error) {
+        console.error("Error fetching the number of cars:", error);
+    }
+}
+
+//calling number of car func at file opening :
+await getNumberOfCars();
+console.log("current number of cars : ", nbCars);
 
 //creating the struct to have similars one as in the SC 
 const LeaseState = {
@@ -118,15 +141,13 @@ async function submitCarForm(event) {
 
 /* function to load the car list from SC and display it
 TODO : 
-- take into account the deletion of vehicles (use a SC function that returns the list of vehicles)
-- number of vehicles statically defined for the moment (add a function in the smart contract? (just return the local controller to the smart contract))
-- make the function robust to non-consecutive IDs
+- make the function robust to non-consecutive IDs (in case of car deleting)
+- display only available cars ?
 */
 async function loadCars() {
-    if (!walletClient) {
-        alert("Please connect your wallet first!");
-        return;
-    }
+    //retreiving current car number
+    await getNumberOfCars();
+    console.log("current number of cars : ", nbCars);
 
     try {
         let carID = 1; //first car has id : 1 and after we increment
@@ -152,9 +173,8 @@ async function loadCars() {
                     <p><strong>Model:</strong> ${carDetails.model}</p>
                     <p><strong>Color:</strong> ${carDetails.color}</p>
                     <p><strong>Year of Matriculation:</strong> ${carDetails.yearOfMatriculation}</p>
-                    <p><strong>Original Value:</strong> ${parseInt(carDetails.originalValue) / 1e18} ETH (ou ${parseInt(carDetails.originalValue)} en wei (value * 10e-18ETH)</p>
+                    <p><strong>Original Value:</strong> ${parseInt(carDetails.originalValue) / 1e18} ETH (${parseInt(carDetails.originalValue)} wei)</p>
                     <p><strong>Mileage:</strong> ${carDetails.mileage}</p>
-                    <hr>
                 `;
                 carListElement.appendChild(carItem);
                 carID++;
@@ -305,6 +325,10 @@ async function loadCarsWithOwners() {
         return;
     }
 
+    //retreiving current car number
+    await getNumberOfCars();
+    console.log("current number of cars : ", nbCars);
+
     try {
         let carID = 1;
         const carListElement = document.getElementById('carOwners');
@@ -326,7 +350,6 @@ async function loadCarsWithOwners() {
                 carItem.innerHTML = `
                     <p><strong>Car ID:</strong> ${carID}</p>
                     <p><strong>Owner Address:</strong> ${owner}</p>
-                    <hr>
                 `;
                 carListElement.appendChild(carItem);
                 carID++;
@@ -346,6 +369,7 @@ async function loadCarsWithOwners() {
 /* TODO : 
 - Make sure we can display dates (next due date, start date, ...)
 - Display other info from struct Lease is much more extensive than what we're currently displaying
+- Make sure the PaymentStatus is update well (check if updated regularly enought in SC)
 */
 async function loadAllLeases() {
 
@@ -382,8 +406,7 @@ async function loadAllLeases() {
                 <p><strong>Down Payment:</strong> ${lease.downPayment} wei</p>
                 <p><strong>Lease State:</strong> ${LeaseState[lease.state]}</p>
                 <p><strong>Last Payment Status:</strong> ${PaymentState[lease.lastPaymentStatut]}</p>
-                <p><strong>Consecutive Missed Payments:</strong> ${lease.consecutiveMissedPayments}</p>
-                <hr>
+                <p><strong>Consecutive Late Payments:</strong> ${lease.consecutiveMissedPayments}</p>
             `;
             leasesElement.appendChild(leaseItem);
         }
@@ -431,10 +454,10 @@ async function submitMonthlyPaymentForm(event) {
 }
 
 // Function for owner to check payment status
-// by calling checkMonthlyPayment from the SC, this JS function also initialize a NFT repossesion if necessary (costs gaz)
+// by calling checkMonthlyPayment from the SC, a NFT repossesion is initiated by SC if necessary (reason why it costs gaz)
 /* TODO: 
 - retrieve the payment status to display it (use getAllLease at worst)
-- reset an alert after retrieving the correct PaymentStatus
+- pop up an alert after retrieving the correct PaymentStatus to print it on screen
 */
 async function checkPaymentStatusForm(event) {
     event.preventDefault();
@@ -477,7 +500,7 @@ async function checkPaymentStatusForm(event) {
             functionName: 'mint',
             account,
           })
-          const hash = await walletClient.writeContract(request)
+        const hash = await walletClient.writeContract(request)
         
 
         console.log("affichage du raw paymentStatut : ", paymentStatut);
@@ -574,7 +597,7 @@ async function submitExtendLeaseForm(event) {
     }
 }
 
-// Function to sign a new lease by calling signNewLease from SC
+// function to sign a new lease by calling signNewLease from SC
 async function submitSignNewLeaseForm(event) {
     event.preventDefault(); // Prevent page reload on form submission
 
